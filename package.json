@@ -1,0 +1,24 @@
+{
+   "name": "DoraHotel",
+   "version": "0.0.1",
+   "description": "Awesome project developed with TypeORM.",
+   "type": "commonjs",
+   "dependencies": {
+      "bcrypt": "^6.0.0",
+      "cors": "^2.8.5",
+      "dotenv": "^17.2.3",
+      "express": "^5.2.1",
+      "jsonwebtoken": "^9.0.3",
+      "pg": "^8.16.3",
+      "typeorm": "^0.3.28"
+   },
+   "scripts": {
+      "start": "ts-node src/index.ts",
+      "dev": "nodemon --exec ts-node src/index.ts"
+   },
+   "devDependencies": {
+      "@types/node": "^25.0.3",
+      "ts-node": "^10.9.2",
+      "typescript": "^5.9.3"
+   }
+}
