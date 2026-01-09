@@ -3,6 +3,21 @@ import { DataSource } from "typeorm"
 import { User } from "./dto/User"
 import { Account } from "./dto/Account"
 import * as dotenv from "dotenv"
+import { Hotel } from "./dto/Hotel"
+import { Floor } from "./dto/Floor"
+import { RoomType } from "./dto/RoomType"
+import { Room } from "./dto/Room"
+
+import { Amenities } from "./dto/Amenities"
+import { RoomTypeAmenities } from "./dto/RoomTypeAmenities"
+
+import { Promotion } from "./dto/Promotion"
+import { Booking } from "./dto/Booking"
+import { BookingDetail } from "./dto/BookingDetail"
+
+import { Review } from "./dto/Review"
+
+import { BookingRoomAllocation } from "./dto/BookingRoomAllocation"
 
 dotenv.config()
 
@@ -15,7 +30,7 @@ export const AppDataSource = new DataSource({
     database: process.env.DB_NAME,
     synchronize: true,
     logging: false,
-    entities: [User, Account],
+    entities: [User, Account, Hotel, Floor, Room, RoomType, Amenities, RoomTypeAmenities, Promotion, Booking, BookingDetail, Review, BookingRoomAllocation],
     migrations: [],
     subscribers: [],
 })
