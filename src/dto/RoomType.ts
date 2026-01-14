@@ -24,10 +24,7 @@ export class RoomType {
     base_price: number;
 
     @Column({ nullable: true })
-    capacity_adults: number;
-
-    @Column({ nullable: true })
-    capacity_children: number;
+    capacity_people: number;
 
     @Column({ nullable: true })
     size_m2: number;

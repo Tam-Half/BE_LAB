@@ -46,6 +46,15 @@ export class Booking {
     @Column({ type: "text", nullable: true })
     note: string;
 
+    @Column({ nullable: true })
+    guest_count: number;
+
+    @Column({ nullable: true })
+    guest_name: string;
+
+    @Column({ nullable: true })
+    guest_phone: string;
+
     @ManyToOne(() => Promotion, (promotion) => promotion.id, { nullable: true })
     @JoinColumn({ name: "promotion_id" })
     promotion: Promotion;
