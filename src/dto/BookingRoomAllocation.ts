@@ -16,8 +16,11 @@ export class BookingRoomAllocation {
     room: Room;
 
     @Column({ type: "timestamp", nullable: true })
-    check_in_real: Date;
+    check_in_date: Date;
 
     @Column({ type: "timestamp", nullable: true })
-    check_out_real: Date;
+    check_out_date: Date;
+
+    @Column({ type: "decimal", precision: 15, scale: 2, nullable: true })
+    price_at_booking: number;
 }
