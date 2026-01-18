@@ -87,6 +87,7 @@ const bookingService = {
                 total_price: totalPrice,
                 status: "PENDING",
                 payment_status: "unpaid",
+                expires_at: new Date(Date.now() + 15 * 60 * 1000),
                 note,
                 guest_count,
                 guest_name,

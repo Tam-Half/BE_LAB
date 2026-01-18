@@ -11,7 +11,9 @@ import hotelRouter from "./routes/Hotel.Route"
 import roomRouter from "./routes/Room.Route"
 import roomTypeRouter from "./routes/RoomType.Route"
 import bookingRouter from "./routes/Booking.Route"
+import paymentRouter from "./routes/Payment.Route"
 import { authentification } from "./middleware/auth.middleware"
+import { initCron } from "./helpers/cron"
 
 const app = express()
 app.use(express.json())
@@ -26,6 +28,9 @@ AppDataSource.initialize().then(async () => {
     app.use("/api/room", roomRouter)
     app.use("/api/room-type", roomTypeRouter)
     app.use("/api/booking", bookingRouter)
+    app.use("/api/payment", paymentRouter)
+
+    initCron()
 
     app.listen(3000, () => {
         console.log("Server is running on port 3000")

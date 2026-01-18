@@ -59,6 +59,9 @@ export class Booking {
     @JoinColumn({ name: "promotion_id" })
     promotion: Promotion;
 
+    @Column({ type: "timestamp", nullable: true })
+    expires_at: Date;
+
     @CreateDateColumn()
     created_at: Date;
 

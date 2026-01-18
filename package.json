@@ -6,11 +6,12 @@
    "dependencies": {
       "bcrypt": "^6.0.0",
       "cors": "^2.8.5",
+      "cron": "^4.4.0",
       "dotenv": "^17.2.3",
       "express": "^5.2.1",
       "jsonwebtoken": "^9.0.3",
       "pg": "^8.16.3",
-      "typeorm": "^0.3.28"
+      "typeorm": "^0.3.1"
    },
    "scripts": {
       "start": "ts-node src/index.ts",

@@ -16,8 +16,8 @@ import { Booking } from "./dto/Booking"
 import { BookingDetail } from "./dto/BookingDetail"
 
 import { Review } from "./dto/Review"
-
 import { BookingRoomAllocation } from "./dto/BookingRoomAllocation"
+import { Payment } from "./dto/Payment"
 
 dotenv.config()
 
@@ -30,7 +30,7 @@ export const AppDataSource = new DataSource({
     database: process.env.DB_NAME,
     synchronize: true,
     logging: false,
-    entities: [User, Account, Hotel, Floor, Room, RoomType, Amenities, RoomTypeAmenities, Promotion, Booking, BookingDetail, Review, BookingRoomAllocation],
+    entities: [User, Account, Hotel, Floor, Room, RoomType, Amenities, RoomTypeAmenities, Promotion, Booking, BookingDetail, Review, BookingRoomAllocation, Payment],
     migrations: [],
     subscribers: [],
 })
