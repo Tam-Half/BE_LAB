@@ -22,11 +22,34 @@ const userService = {
             account: newAccount,
             name: payload.name,
             phone_number: payload.phone_number,
-            address: payload.address,
             avatar_url: payload.avatar_url,
         })
         const newUser = await userRepository.save(user);
         return newUser;
+    },
+    getProfile: async (userId: string) => {
+        return await userRepository.findOne({
+            where: { id: userId },
+            relations: ["account"]
+        });
+    },
+    forgotPassword: async (email: string) => {
+        const account = await accountRepository.findOne({ where: { email } });
+        if (!account) {
+            throw new Error("Không tìm thấy tài khoản với email này");
+        }
+        // In a real app, send email with reset token here
+        return true;
+    },
+    resetPassword: async (email: string, newPassword: string) => {
+        const account = await accountRepository.findOne({ where: { email } });
+        if (!account) {
+            throw new Error("Không tìm thấy tài khoản với email này");
+        }
+        const hashedPassword = await encrypt.encryptPassword(newPassword);
+        account.password = hashedPassword;
+        await accountRepository.save(account);
+        return true;
     }
 }
 

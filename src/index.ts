@@ -16,6 +16,7 @@ import { authentification } from "./middleware/auth.middleware"
 import { initCron } from "./helpers/cron"
 
 const app = express()
+const port = 3000
 app.use(express.json())
 app.use(cors())
 
@@ -32,8 +33,8 @@ AppDataSource.initialize().then(async () => {
 
     initCron()
 
-    app.listen(3000, () => {
-        console.log("Server is running on port 3000")
+    app.listen(port, () => {
+        console.log(`Server is running on ${port}`)
     })
 
 }).catch(error => console.log(error))

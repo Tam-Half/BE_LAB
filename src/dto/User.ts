@@ -26,10 +26,7 @@ export class User {
     @Column({ nullable: false })
     phone_number: string;
 
-    @Column({ nullable: false })
-    address: string;
-
-    @Column()
+    @Column({ nullable: true })
     avatar_url: string;
 
     @CreateDateColumn()
