@@ -8,6 +8,16 @@ const userRepository = AppDataSource.getRepository(User);
 
 const userService = {
     create: async (payload: any) => {
+        const existingEmail = await accountRepository.findOne({ where: { email: payload.email } });
+        if (existingEmail) {
+            throw new Error("Email đã được sử dụng");
+        }
+
+        const existingPhone = await userRepository.findOne({ where: { phone_number: payload.phone_number } });
+        if (existingPhone) {
+            throw new Error("Số điện thoại đã được sử dụng");
+        }
+
         const password = payload.password;
         const hasedPassword = await encrypt.encryptPassword(password);
         const account = accountRepository.create({

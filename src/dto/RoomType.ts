@@ -5,6 +5,7 @@ import {
     CreateDateColumn,
     OneToMany,
 } from "typeorm";
+import { RoomTypeImage } from "./RoomTypeImage";
 
 @Entity({ name: "room_types" })
 export class RoomType {
@@ -20,7 +21,7 @@ export class RoomType {
     @Column({ type: "text", nullable: true })
     description: string;
 
-    @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+    @Column({ type: "decimal", precision: 10, nullable: true })
     base_price: number;
 
     @Column({ nullable: true })
@@ -34,4 +35,7 @@ export class RoomType {
 
     @OneToMany("Room", "roomType")
     rooms: any[];
+
+    @OneToMany(() => RoomTypeImage, (image) => image.roomType)
+    images: RoomTypeImage[];
 }

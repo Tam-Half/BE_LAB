@@ -1,10 +1,23 @@
 import roomTypeService from "../services/RoomType.Service";
+import { uploadToCloudinary } from "../middleware/upload";
 
 const roomTypeController = {
     create: async (req, res) => {
         try {
             const payload = req.body;
-            const roomType = await roomTypeService.create(payload);
+            const files = req.files as Express.Multer.File[];
+
+            let uploadedImages = [];
+            if (files && files.length > 0) {
+                const uploadPromises = files.map(file => uploadToCloudinary(file, "DoraHotel/RoomType"));
+                const results = await Promise.all(uploadPromises);
+                uploadedImages = results.map((result: any) => ({
+                    url: result.secure_url,
+                    public_id: result.public_id
+                }));
+            }
+
+            const roomType = await roomTypeService.create(payload, uploadedImages);
             res.status(201).json({ message: "Tạo loại phòng thành công", data: roomType });
         } catch (error) {
             console.log("Lỗi khi tạo loại phòng", error);

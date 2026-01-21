@@ -24,7 +24,7 @@ const paymentController = {
 
     getById: async (req: Request, res: Response) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseInt(req.params.id as string);
             const payment = await paymentService.getById(id);
             if (!payment) {
                 return res.status(404).json({ message: "Payment not found" });
@@ -38,7 +38,7 @@ const paymentController = {
 
     update: async (req: Request, res: Response) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseInt(req.params.id as string);
             const payment = await paymentService.update(id, req.body);
             res.status(200).json({ message: "Payment updated successfully", data: payment });
         } catch (error) {
@@ -49,7 +49,7 @@ const paymentController = {
 
     delete: async (req: Request, res: Response) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseInt(req.params.id as string);
             await paymentService.delete(id);
             res.status(200).json({ message: "Payment deleted successfully" });
         } catch (error) {
