@@ -5,9 +5,11 @@ import {
     CreateDateColumn,
     ManyToOne,
     JoinColumn,
+    OneToMany,
 } from "typeorm";
 import { Floor } from "./Floor";
 import { RoomType } from "./RoomType";
+import { BookingRoomAllocation } from "./BookingRoomAllocation";
 
 @Entity({ name: "rooms" })
 export class Room {
@@ -30,4 +32,7 @@ export class Room {
 
     @CreateDateColumn()
     created_at: Date;
+
+    @OneToMany(() => BookingRoomAllocation, (a) => a.room)
+    roomAllocations: BookingRoomAllocation[];
 }

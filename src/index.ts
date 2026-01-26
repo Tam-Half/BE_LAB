@@ -12,6 +12,7 @@ import roomRouter from "./routes/Room.Route"
 import roomTypeRouter from "./routes/RoomType.Route"
 import bookingRouter from "./routes/Booking.Route"
 import paymentRouter from "./routes/Payment.Route"
+import availabilityRouter from "./routes/Availability.Route"
 import { authentification } from "./middleware/auth.middleware"
 import { initCron } from "./helpers/cron"
 
@@ -30,6 +31,7 @@ AppDataSource.initialize().then(async () => {
     app.use("/api/room-type", roomTypeRouter)
     app.use("/api/booking", bookingRouter)
     app.use("/api/payment", paymentRouter)
+    app.use("/api/availability", availabilityRouter)
 
     initCron()
 

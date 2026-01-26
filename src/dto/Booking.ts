@@ -11,6 +11,7 @@ import { User } from "./User";
 import { Hotel } from "./Hotel";
 import { Promotion } from "./Promotion";
 import { BookingDetail } from "./BookingDetail";
+import { BookingRoom } from "./BookingRoom";
 
 @Entity({ name: "bookings" })
 export class Booking {
@@ -67,4 +68,7 @@ export class Booking {
 
     @OneToMany(() => BookingDetail, (bookingDetail) => bookingDetail.booking)
     bookingDetails: BookingDetail[];
+
+    @OneToMany(() => BookingRoom, (br) => br.booking)
+    bookingRooms: BookingRoom[];
 }

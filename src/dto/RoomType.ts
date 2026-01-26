@@ -6,6 +6,7 @@ import {
     OneToMany,
 } from "typeorm";
 import { RoomTypeImage } from "./RoomTypeImage";
+import { BookingRoom } from "./BookingRoom";
 
 @Entity({ name: "room_types" })
 export class RoomType {
@@ -38,4 +39,8 @@ export class RoomType {
 
     @OneToMany(() => RoomTypeImage, (image) => image.roomType)
     images: RoomTypeImage[];
+
+    @OneToMany(() => BookingRoom, (br) => br.roomType)
+    bookingRooms: BookingRoom[];
+
 }
