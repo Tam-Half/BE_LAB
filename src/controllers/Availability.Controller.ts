@@ -4,7 +4,7 @@ import AvailabilityService from "../services/Availability.Service";
 const AvailabilityController = {
     search: async (req: Request, res: Response) => {
         try {
-            const { checkIn, checkOut, adultCount, childCount, childAges, rooms } = req.body;
+            const { checkIn, checkOut, rooms } = req.body;
 
             if (!checkIn || !checkOut) {
                 return res.status(400).json({
@@ -15,9 +15,6 @@ const AvailabilityController = {
             const result = await AvailabilityService.search({
                 checkIn,
                 checkOut,
-                adultCount,
-                childCount,
-                childAges,
                 rooms
             });
 

@@ -11,17 +11,11 @@ const AvailabilityService = {
     search: async (payload: {
         checkIn: string;
         checkOut: string;
-        adultCount?: number;
-        childCount?: number;
-        childAges?: number[];
         rooms?: Array<{
             roomTypeId?: number;
-            adultCount: number;
-            childCount: number;
-            childAges: number[];
         }>;
     }) => {
-        const { checkIn, checkOut, adultCount, childCount, childAges, rooms } = payload;
+        const { checkIn, checkOut, rooms } = payload;
         const checkInDate = new Date(checkIn);
         const checkOutDate = new Date(checkOut);
 
@@ -41,14 +35,8 @@ const AvailabilityService = {
             return await AvailabilityService.getQuote(checkInDate, checkOutDate, nights, rooms);
         }
 
-        // 2. Discovery Mode (Search): fallback to top-level or rooms[0] guest counts
-        const searchCriteria = (rooms && rooms.length > 0) ? rooms[0] : {
-            adultCount: adultCount || 1,
-            childCount: childCount || 0,
-            childAges: childAges || []
-        };
-
-        return await AvailabilityService.discover(checkInDate, checkOutDate, nights, searchCriteria);
+        // 2. Discovery Mode (Search)
+        return await AvailabilityService.discover(checkInDate, checkOutDate, nights);
     },
 
     getQuote: async (checkInDate: Date, checkOutDate: Date, nights: number, rooms: any[]) => {
@@ -63,7 +51,7 @@ const AvailabilityService = {
             if (!roomType) continue;
 
             const availability = await AvailabilityService.checkRoomTypeAvailability(roomType.id, checkInDate, checkOutDate);
-            const priceInfo = AvailabilityService.calculatePrice(roomType, nights, roomReq.adultCount, roomReq.childCount, roomReq.childAges);
+            const priceInfo = AvailabilityService.calculatePrice(roomType, nights);
 
             results.push({
                 roomTypeId: roomType.id,
@@ -83,25 +71,15 @@ const AvailabilityService = {
         };
     },
 
-    discover: async (checkInDate: Date, checkOutDate: Date, nights: number, criteria: { adultCount: number, childCount: number, childAges: number[] }) => {
+    discover: async (checkInDate: Date, checkOutDate: Date, nights: number) => {
         const allRoomTypes = await roomTypeRepository.find();
         const results = [];
 
         for (const roomType of allRoomTypes) {
-            // Logic check capacity
-            const asAdults = criteria.childAges.filter(age => age >= 12).length;
-            const totalRequiredAdults = criteria.adultCount + asAdults;
-
-            // Allow up to capacity + 1 (using extra adult fee)
-            const capacity = roomType.capacity_people || 2;
-            if (totalRequiredAdults > capacity + 1) {
-                continue;
-            }
-
             const availability = await AvailabilityService.checkRoomTypeAvailability(roomType.id, checkInDate, checkOutDate);
 
             if (availability.availableCount > 0) {
-                const priceInfo = AvailabilityService.calculatePrice(roomType, nights, criteria.adultCount, criteria.childCount, criteria.childAges);
+                const priceInfo = AvailabilityService.calculatePrice(roomType, nights);
 
                 results.push({
                     roomTypeId: roomType.id,
@@ -119,7 +97,6 @@ const AvailabilityService = {
             checkIn: checkInDate.toISOString().split('T')[0],
             checkOut: checkOutDate.toISOString().split('T')[0],
             nights,
-            searchCriteria: criteria,
             availableRoomTypes: results
         };
     },
@@ -143,39 +120,17 @@ const AvailabilityService = {
         };
     },
 
-    calculatePrice: (roomType: RoomType, nights: number, adultCount: number, childCount: number, childAges: number[]) => {
-        const CHILD_FEE = 100000;
-        const EXTRA_ADULT_FEE = 200000;
-
-        let freeChildren = 0;
-        let paidChildren = 0;
-        let asAdults = 0;
-
-        for (const age of childAges) {
-            if (age < 6) freeChildren++;
-            else if (age < 12) paidChildren++;
-            else asAdults++;
-        }
-
-        const totalAdults = adultCount + asAdults;
-        const standardCapacity = roomType.capacity_people || 2;
-        const extraAdults = Math.max(0, totalAdults - standardCapacity);
-
-        const childFeePerNight = paidChildren * CHILD_FEE;
-        const extraAdultFeePerNight = extraAdults * EXTRA_ADULT_FEE;
+    calculatePrice: (roomType: RoomType, nights: number) => {
         const basePrice = Number(roomType.base_price) || 0;
 
-        const nightlyPrice = basePrice + childFeePerNight + extraAdultFeePerNight;
+        const nightlyPrice = basePrice;
         const itemTotal = nightlyPrice * nights;
 
         return {
             nights,
             pricePerNight: basePrice,
-            childFeePerNight,
-            extraAdultFeePerNight,
             totalPerNight: nightlyPrice,
             itemTotal,
-            breakdown: { paidChildren, freeChildren, asAdults, extraAdults }
         };
     }
 };
