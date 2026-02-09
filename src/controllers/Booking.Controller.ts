@@ -24,7 +24,7 @@ const bookingController = {
 
     getById: async (req: Request, res: Response) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseInt(req.params.id as string);
             const booking = await bookingService.getById(id);
             if (!booking) {
                 return res.status(404).json({ message: "Booking not found" });
@@ -38,7 +38,7 @@ const bookingController = {
 
     update: async (req: Request, res: Response) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseInt(req.params.id as string);
             const booking = await bookingService.update(id, req.body);
             res.status(200).json({ message: "Booking updated successfully", data: booking });
         } catch (error) {
@@ -49,7 +49,7 @@ const bookingController = {
 
     delete: async (req: Request, res: Response) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseInt(req.params.id as string);
             await bookingService.delete(id);
             res.status(200).json({ message: "Booking deleted successfully" });
         } catch (error) {

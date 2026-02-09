@@ -6,6 +6,9 @@ const floorRepository = AppDataSource.getRepository(Floor);
 const hotelRepository = AppDataSource.getRepository(Hotel);
 
 const floorService = {
+    getAll: async () => {
+        return await floorRepository.find();
+    },
     create: async (payload: any) => {
         const hotel = await hotelRepository.findOne({ where: { id: payload.hotel_id } });
         if (!hotel) {

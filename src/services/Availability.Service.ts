@@ -1,0 +1,138 @@
+import { AppDataSource } from "../data-source";
+import { RoomType } from "../dto/RoomType";
+import { Room } from "../dto/Room";
+import { BookingRoomAllocation } from "../dto/BookingRoomAllocation";
+
+const roomTypeRepository = AppDataSource.getRepository(RoomType);
+const roomRepository = AppDataSource.getRepository(Room);
+const allocationRepository = AppDataSource.getRepository(BookingRoomAllocation);
+
+const AvailabilityService = {
+    search: async (payload: {
+        checkIn: string;
+        checkOut: string;
+        rooms?: Array<{
+            roomTypeId?: number;
+        }>;
+    }) => {
+        const { checkIn, checkOut, rooms } = payload;
+        const checkInDate = new Date(checkIn);
+        const checkOutDate = new Date(checkOut);
+
+        if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
+            throw new Error("Invalid date format. Use YYYY-MM-DD.");
+        }
+
+        if (checkOutDate <= checkInDate) {
+            throw new Error("Check-out date must be after check-in date.");
+        }
+
+        const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Detect mode:
+        // 1. Specific Room Quote: 'rooms' is present AND all items have 'roomTypeId'
+        if (rooms && rooms.length > 0 && rooms.every(r => r.roomTypeId)) {
+            return await AvailabilityService.getQuote(checkInDate, checkOutDate, nights, rooms);
+        }
+
+        // 2. Discovery Mode (Search)
+        return await AvailabilityService.discover(checkInDate, checkOutDate, nights);
+    },
+
+    getQuote: async (checkInDate: Date, checkOutDate: Date, nights: number, rooms: any[]) => {
+        const results = [];
+        let grandTotal = 0;
+
+        for (const roomReq of rooms) {
+            const roomType = await roomTypeRepository.findOne({
+                where: { id: roomReq.roomTypeId }
+            });
+
+            if (!roomType) continue;
+
+            const availability = await AvailabilityService.checkRoomTypeAvailability(roomType.id, checkInDate, checkOutDate);
+            const priceInfo = AvailabilityService.calculatePrice(roomType, nights);
+
+            results.push({
+                roomTypeId: roomType.id,
+                roomTypeName: roomType.name,
+                availableCount: availability.availableCount,
+                ...priceInfo
+            });
+
+            grandTotal += priceInfo.itemTotal;
+        }
+
+        return {
+            quoteId: `q_${Math.random().toString(36).substring(2, 9)}`,
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+            items: results,
+            totalAmount: grandTotal
+        };
+    },
+
+    discover: async (checkInDate: Date, checkOutDate: Date, nights: number) => {
+        const allRoomTypes = await roomTypeRepository.find();
+        const results = [];
+
+        for (const roomType of allRoomTypes) {
+            const availability = await AvailabilityService.checkRoomTypeAvailability(roomType.id, checkInDate, checkOutDate);
+
+            if (availability.availableCount > 0) {
+                const priceInfo = AvailabilityService.calculatePrice(roomType, nights);
+
+                results.push({
+                    roomTypeId: roomType.id,
+                    name: roomType.name,
+                    basePrice: roomType.base_price,
+                    totalRooms: availability.totalRooms,
+                    availableCount: availability.availableCount,
+                    capacity: roomType.capacity_people,
+                    priceQuote: priceInfo
+                });
+            }
+        }
+
+        return {
+            checkIn: checkInDate.toISOString().split('T')[0],
+            checkOut: checkOutDate.toISOString().split('T')[0],
+            nights,
+            availableRoomTypes: results
+        };
+    },
+
+    checkRoomTypeAvailability: async (roomTypeId: number, checkIn: Date, checkOut: Date) => {
+        const totalRooms = await roomRepository.count({ where: { roomType: { id: roomTypeId } } });
+
+        const busyCount = await allocationRepository.createQueryBuilder("allocation")
+            .innerJoin("allocation.room", "room")
+            .where("room.room_type_id = :roomTypeId", { roomTypeId })
+            .andWhere("allocation.check_in_date < :checkOut AND allocation.check_out_date > :checkIn", {
+                checkIn,
+                checkOut
+            })
+            .getCount();
+
+        return {
+            totalRooms,
+            busyCount,
+            availableCount: totalRooms - busyCount
+        };
+    },
+
+    calculatePrice: (roomType: RoomType, nights: number) => {
+        const basePrice = Number(roomType.base_price) || 0;
+
+        const nightlyPrice = basePrice;
+        const itemTotal = nightlyPrice * nights;
+
+        return {
+            nights,
+            pricePerNight: basePrice,
+            totalPerNight: nightlyPrice,
+            itemTotal,
+        };
+    }
+};
+
+export default AvailabilityService;

@@ -1,6 +1,15 @@
 import floorService from "../services/Floor.Service";
 
 const floorController = {
+    getAll: async (req, res) => {
+        try {
+            const floors = await floorService.getAll();
+            res.status(200).json({ message: "Lấy danh sách tầng thành công", data: floors });
+        } catch (error) {
+            console.log("Lỗi khi lấy danh sách tầng", error);
+            res.status(500).json({ message: "Lỗi khi lấy danh sách tầng", error: error.message });
+        }
+    },
     create: async (req, res) => {
         try {
             const payload = req.body;

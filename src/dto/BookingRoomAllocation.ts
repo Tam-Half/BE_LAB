@@ -1,17 +1,17 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
-import { Booking } from "./Booking";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToOne } from "typeorm";
 import { Room } from "./Room";
+import { BookingRoom } from "./BookingRoom";
 
 @Entity({ name: "booking_room_allocation" })
 export class BookingRoomAllocation {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @ManyToOne(() => Booking, (booking) => booking.id)
-    @JoinColumn({ name: "booking_id" })
-    booking: Booking;
+    @OneToOne(() => BookingRoom, (br) => br.allocation, { onDelete: "CASCADE" })
+    @JoinColumn({ name: "booking_room_id" })
+    bookingRoom: BookingRoom;
 
-    @ManyToOne(() => Room, (room) => room.id)
+    @ManyToOne(() => Room, (room) => room.roomAllocations)
     @JoinColumn({ name: "room_id" })
     room: Room;
 

@@ -6,6 +6,7 @@ import * as dotenv from "dotenv"
 import { Hotel } from "./dto/Hotel"
 import { Floor } from "./dto/Floor"
 import { RoomType } from "./dto/RoomType"
+import { RoomTypeImage } from "./dto/RoomTypeImage"
 import { Room } from "./dto/Room"
 
 import { Amenities } from "./dto/Amenities"
@@ -16,8 +17,9 @@ import { Booking } from "./dto/Booking"
 import { BookingDetail } from "./dto/BookingDetail"
 
 import { Review } from "./dto/Review"
-
 import { BookingRoomAllocation } from "./dto/BookingRoomAllocation"
+import { Payment } from "./dto/Payment"
+import { BookingRoom } from "./dto/BookingRoom"
 
 dotenv.config()
 
@@ -30,7 +32,22 @@ export const AppDataSource = new DataSource({
     database: process.env.DB_NAME,
     synchronize: true,
     logging: false,
-    entities: [User, Account, Hotel, Floor, Room, RoomType, Amenities, RoomTypeAmenities, Promotion, Booking, BookingDetail, Review, BookingRoomAllocation],
+    entities: [User,
+        Account,
+        Hotel,
+        Floor,
+        Room,
+        RoomType,
+        RoomTypeImage,
+        Amenities,
+        RoomTypeAmenities,
+        Promotion,
+        Booking,
+        BookingDetail,
+        Review,
+        BookingRoomAllocation,
+        Payment,
+        BookingRoom],
     migrations: [],
     subscribers: [],
 })
