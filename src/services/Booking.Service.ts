@@ -7,6 +7,7 @@ import { Promotion } from "../dto/Promotion";
 import { RoomType } from "../dto/RoomType";
 import { Room } from "../dto/Room";
 import { BookingRoomAllocation } from "../dto/BookingRoomAllocation";
+import { BookingFilter } from "../interfaces/Booking";
 
 const bookingRepository = AppDataSource.getRepository(Booking);
 const bookingDetailRepository = AppDataSource.getRepository(BookingDetail);
@@ -122,11 +123,31 @@ const bookingService = {
         });
     },
 
-    getAll: async () => {
+    getAll: async (filters: BookingFilter) => {
+        const { status, user_id, hotel_id } = filters;
+
+        // Xây dựng điều kiện lọc động
+        const whereCondition: any = {};
+
+        if (status) {
+            whereCondition.status = status;
+        }
+
+        if (user_id) {
+            whereCondition.user = { id: user_id };
+        }
+
+        if (hotel_id) {
+            whereCondition.hotel = { id: hotel_id };
+        }
+
         return await bookingRepository.find({
-            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion"]
+            where: whereCondition,
+            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion"],
+            order: { created_at: "DESC" } // Thường booking nên hiện cái mới nhất lên đầu
         });
     },
+
 
     getById: async (id: number) => {
         return await bookingRepository.findOne({
