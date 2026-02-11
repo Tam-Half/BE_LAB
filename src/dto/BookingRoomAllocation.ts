@@ -7,6 +7,9 @@ export class BookingRoomAllocation {
     @PrimaryGeneratedColumn()
     id: number;
 
+    @Column({ nullable: false })
+    status: string;
+
     @OneToOne(() => BookingRoom, (br) => br.allocation, { onDelete: "CASCADE" })
     @JoinColumn({ name: "booking_room_id" })
     bookingRoom: BookingRoom;

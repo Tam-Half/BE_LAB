@@ -39,7 +39,7 @@ export class Booking {
     @Column({ type: "decimal", precision: 15, scale: 2, nullable: false })
     total_price: number;
 
-    @Column({ nullable: false })
+    @Column({ nullable: false, default: 'NOT_CHECKED_IN' })
     status: string;
 
     @Column({ nullable: false })
