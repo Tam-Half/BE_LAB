@@ -8,11 +8,8 @@ import { RoomType } from "../dto/RoomType";
 import { Room } from "../dto/Room";
 import { BookingRoom } from "../dto/BookingRoom";
 import { BookingRoomAllocation } from "../dto/BookingRoomAllocation";
-
 import AvailabilityService from "./Availability.Service";
-
 import { BookingFilter } from "../interfaces/Booking";
-
 
 const bookingRepository = AppDataSource.getRepository(Booking);
 const bookingDetailRepository = AppDataSource.getRepository(BookingDetail);
@@ -124,7 +121,8 @@ const bookingService = {
                         room: physicalRoom,
                         check_in_date: checkIn,
                         check_out_date: checkOut,
-                        price_at_booking: basePrice
+                        price_at_booking: basePrice,
+                        status: "NOT_CHECKED_IN"
                     });
                     await transactionalEntityManager.save(allocation);
                 }
