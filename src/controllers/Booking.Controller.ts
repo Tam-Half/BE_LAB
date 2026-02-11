@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import bookingService from "../services/Booking.Service";
+import { BookingFilter } from "../interfaces/Booking";
 
 const bookingController = {
     create: async (req: Request, res: Response) => {
@@ -14,14 +15,27 @@ const bookingController = {
 
     getAll: async (req: Request, res: Response) => {
         try {
-            const bookings = await bookingService.getAll();
+            // Lấy các tham số từ URL query: /bookings?status=PENDING&user_id=5
+            const { status, user_id, hotel_id } = req.query;
+
+            // Đóng gói thành object filter
+            const filters: BookingFilter = {
+                status: status as string,
+                user_id: user_id ? Number(user_id) : undefined,
+                hotel_id: hotel_id ? Number(hotel_id) : undefined,
+            };
+
+            const bookings = await bookingService.getAll(filters);
+
             res.status(200).json(bookings);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error fetching bookings:", error);
-            res.status(500).json({ message: "Error fetching bookings" });
+            res.status(500).json({
+                message: "Error fetching bookings",
+                error: error.message
+            });
         }
     },
-
     getById: async (req: Request, res: Response) => {
         try {
             const id = parseInt(req.params.id as string);
