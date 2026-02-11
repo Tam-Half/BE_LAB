@@ -8,7 +8,11 @@ import { RoomType } from "../dto/RoomType";
 import { Room } from "../dto/Room";
 import { BookingRoom } from "../dto/BookingRoom";
 import { BookingRoomAllocation } from "../dto/BookingRoomAllocation";
-import AvailabilityService from "./Availability.Service";
+// <<<<<<< main
+// import AvailabilityService from "./Availability.Service";
+// =======
+import { BookingFilter } from "../interfaces/Booking";
+// >>>>>>> Tam-Vault
 
 const bookingRepository = AppDataSource.getRepository(Booking);
 const bookingDetailRepository = AppDataSource.getRepository(BookingDetail);
@@ -35,8 +39,7 @@ const bookingService = {
 
         return await AppDataSource.transaction(async (transactionalEntityManager) => {
             const checkIn = new Date(check_in_date);
-            const checkOut = new Date(check_out_date);
-
+            const checkOut = new Date(check_out_date)
             if (checkOut <= checkIn) {
                 throw new Error("Check-out date must be after check-in date");
             }
@@ -152,11 +155,31 @@ const bookingService = {
         });
     },
 
-    getAll: async () => {
+    getAll: async (filters: BookingFilter) => {
+        const { status, user_id, hotel_id } = filters;
+
+        // Xây dựng điều kiện lọc động
+        const whereCondition: any = {};
+
+        if (status) {
+            whereCondition.status = status;
+        }
+
+        if (user_id) {
+            whereCondition.user = { id: user_id };
+        }
+
+        if (hotel_id) {
+            whereCondition.hotel = { id: hotel_id };
+        }
+
         return await bookingRepository.find({
-            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion"]
+            where: whereCondition,
+            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion"],
+            order: { created_at: "DESC" } // Thường booking nên hiện cái mới nhất lên đầu
         });
     },
+
 
     getById: async (id: number) => {
         return await bookingRepository.findOne({
