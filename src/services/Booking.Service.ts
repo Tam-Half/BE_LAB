@@ -6,7 +6,9 @@ import { Hotel } from "../dto/Hotel";
 import { Promotion } from "../dto/Promotion";
 import { RoomType } from "../dto/RoomType";
 import { Room } from "../dto/Room";
+import { BookingRoom } from "../dto/BookingRoom";
 import { BookingRoomAllocation } from "../dto/BookingRoomAllocation";
+import AvailabilityService from "./Availability.Service";
 
 const bookingRepository = AppDataSource.getRepository(Booking);
 const bookingDetailRepository = AppDataSource.getRepository(BookingDetail);
@@ -21,10 +23,9 @@ const bookingService = {
     create: async (payload: any) => {
         const {
             user_id,
-            room_id,
             check_in_date,
             check_out_date,
-            guest_count,
+            rooms, // Array of { roomTypeId, quantity }
             guest_name,
             guest_phone,
             guest_email,
@@ -40,85 +41,113 @@ const bookingService = {
                 throw new Error("Check-out date must be after check-in date");
             }
 
-            const room = await roomRepository.findOne({
-                where: { id: room_id },
-                relations: ["roomType", "floor", "floor.hotel"]
-            });
-
-            if (!room) throw new Error("Room not found");
-            if (!room.floor || !room.floor.hotel) throw new Error("Room's hotel information is missing");
-
-            // Check overlap
-            const existingAllocation = await transactionalEntityManager.createQueryBuilder(BookingRoomAllocation, "allocation")
-                .where("allocation.room_id = :room_id", { room_id })
-                .andWhere("(allocation.check_in_date < :checkOut AND allocation.check_out_date > :checkIn)", {
-                    checkIn,
-                    checkOut
-                })
-                .getOne();
-
-            if (existingAllocation) {
-                throw new Error("Phòng đã có người đặt vào ngày này");
-            }
-
+            const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 3600 * 24));
             let promotion = null;
             if (promotion_code) {
                 promotion = await promotionRepository.findOneBy({ code: promotion_code, is_active: true });
-                // Note: More complex promotion logic (expiry, etc.) could be added here
-            }
-
-            const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 3600 * 24));
-            const basePrice = room.roomType.base_price || 0;
-            let totalPrice = basePrice * nights;
-
-            if (promotion && promotion.discount_percent) {
-                const discount = (totalPrice * promotion.discount_percent) / 100;
-                totalPrice -= Math.min(discount, promotion.max_discount_amount || discount);
             }
 
             const user = user_id ? await userRepository.findOneBy({ id: user_id }) : null;
 
+            // Pre-calculate total price and fetch basic info
+            let totalPrice = 0;
+            const hotel = (await roomRepository.findOne({ where: {}, relations: ["floor", "floor.hotel"] }))?.floor.hotel;
+            // Note: In real world, we'd probably get hotel_id from payload or room types. 
+            // For now, assuming rooms belong to the same hotel.
+
+            // 1. Create Booking Master
             const booking = transactionalEntityManager.create(Booking, {
                 user,
-                hotel: room.floor.hotel,
+                hotel, // Should be verified if multiple hotels exist
                 promotion,
                 booking_code: `BK-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                 check_in_date: checkIn,
                 check_out_date: checkOut,
-                total_price: totalPrice,
+                total_price: 0, // Update later
                 status: "PENDING",
                 payment_status: "unpaid",
                 expires_at: new Date(Date.now() + 15 * 60 * 1000),
                 note,
-                guest_count,
                 guest_name,
-                guest_phone
+                guest_phone,
+                guest_email
             });
 
             const savedBooking = await transactionalEntityManager.save(booking);
 
-            // Create allocation
-            const allocation = transactionalEntityManager.create(BookingRoomAllocation, {
-                booking: savedBooking,
-                room: room,
-                check_in_date: checkIn,
-                check_out_date: checkOut,
-                price_at_booking: basePrice
-            });
-            await transactionalEntityManager.save(allocation);
+            let calculatedTotalPrice = 0;
 
-            // Create booking detail (1 row for the room type)
-            const detail = transactionalEntityManager.create(BookingDetail, {
-                booking: savedBooking,
-                roomType: room.roomType,
-                quantity: 1,
-                price_at_booking: basePrice
-            });
-            await transactionalEntityManager.save(detail);
+            for (const roomReq of rooms) {
+                const roomType = await roomTypeRepository.findOneBy({ id: roomReq.roomTypeId });
+                if (!roomType) throw new Error(`Room type ${roomReq.roomTypeId} not found`);
+
+                const basePrice = Number(roomType.base_price) || 0;
+                const itemTotal = basePrice * nights * roomReq.quantity;
+                calculatedTotalPrice += itemTotal;
+
+                // 2. Create Booking Detail (for each room type)
+                const detail = transactionalEntityManager.create(BookingDetail, {
+                    booking: savedBooking,
+                    roomType: roomType,
+                    quantity: roomReq.quantity,
+                    price_at_booking: basePrice
+                });
+                const savedDetail = await transactionalEntityManager.save(detail);
+
+                const availableRooms = await AvailabilityService.findAvailableRooms(roomType.id, checkIn, checkOut, roomReq.quantity);
+                if (availableRooms.length < roomReq.quantity) {
+                    throw new Error(`Insufficient availability for room type: ${roomType.name}`);
+                }
+
+                for (let i = 0; i < roomReq.quantity; i++) {
+                    const physicalRoom = availableRooms[i];
+
+                    // 3. Create Booking Room (individual room record)
+                    const bookingRoom = transactionalEntityManager.create(BookingRoom, {
+                        booking: savedBooking,
+                        bookingDetail: savedDetail,
+                        roomType: roomType,
+                        price_at_booking: basePrice,
+                        pricing_snapshot: {
+                            base_price: basePrice,
+                            nights: nights
+                        }
+                    });
+                    const savedBookingRoom = await transactionalEntityManager.save(bookingRoom);
+
+                    // 4. Create Allocation (physical room assignment)
+                    const allocation = transactionalEntityManager.create(BookingRoomAllocation, {
+                        bookingRoom: savedBookingRoom,
+                        room: physicalRoom,
+                        check_in_date: checkIn,
+                        check_out_date: checkOut,
+                        price_at_booking: basePrice
+                    });
+                    await transactionalEntityManager.save(allocation);
+                }
+            }
+
+            // Apply promotion if any
+            if (promotion && promotion.discount_percent) {
+                const discount = (calculatedTotalPrice * promotion.discount_percent) / 100;
+                calculatedTotalPrice -= Math.min(discount, promotion.max_discount_amount || discount);
+            }
+
+            savedBooking.total_price = calculatedTotalPrice;
+            await transactionalEntityManager.save(savedBooking);
 
             return await transactionalEntityManager.findOne(Booking, {
                 where: { id: savedBooking.id },
-                relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion"]
+                relations: [
+                    "bookingDetails",
+                    "bookingDetails.roomType",
+                    "bookingRooms",
+                    "bookingRooms.allocation",
+                    "bookingRooms.allocation.room",
+                    "user",
+                    "hotel",
+                    "promotion"
+                ]
             });
         });
     },

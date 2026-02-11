@@ -12,12 +12,10 @@ import {
 } from "typeorm";
 import { Booking } from "./Booking";
 import { RoomType } from "./RoomType";
+import { BookingDetail } from "./BookingDetail";
 import { BookingRoomAllocation } from "./BookingRoomAllocation";
 
 @Entity({ name: "booking_rooms" })
-@Check(`"adult_count" >= 0`)
-@Check(`"child_count" >= 0`)
-@Check(`("child_count" = COALESCE(array_length("child_ages", 1), 0))`)
 export class BookingRoom {
     @PrimaryGeneratedColumn()
     id: number;
@@ -26,22 +24,13 @@ export class BookingRoom {
     @JoinColumn({ name: "booking_id" })
     booking: Booking;
 
+    @ManyToOne(() => BookingDetail, (bd) => bd.bookingRooms, { onDelete: "CASCADE" })
+    @JoinColumn({ name: "booking_detail_id" })
+    bookingDetail: BookingDetail;
+
     @ManyToOne(() => RoomType, (rt) => rt.bookingRooms, { onDelete: "RESTRICT" })
     @JoinColumn({ name: "room_type_id" })
     roomType: RoomType;
-
-    // Người lớn user nhập
-    @Column({ type: "int", default: 1 })
-    adult_count: number;
-
-    // Số trẻ em user nhập (tuổi nằm trong child_ages)
-    @Column({ type: "int", default: 0 })
-    child_count: number;
-
-    // Lưu tuổi từng trẻ em: [2, 7, 12]...
-    // (>=12 backend sẽ quy đổi tính như adult)
-    @Column({ type: "int", array: true, default: () => "ARRAY[]::int[]" })
-    child_ages: number[];
 
     // Snapshot giá theo “phòng đặt” (tuỳ bạn có cần chốt chi tiết)
     @Column({ type: "decimal", precision: 15, scale: 2, nullable: true })
