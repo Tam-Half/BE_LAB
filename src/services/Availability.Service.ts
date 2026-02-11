@@ -45,7 +45,8 @@ const AvailabilityService = {
 
         for (const roomReq of rooms) {
             const roomType = await roomTypeRepository.findOne({
-                where: { id: roomReq.roomTypeId }
+                where: { id: roomReq.roomTypeId },
+                relations: ["images"]
             });
 
             if (!roomType) continue;
@@ -57,7 +58,7 @@ const AvailabilityService = {
                 roomTypeId: roomType.id,
                 roomTypeName: roomType.name,
                 availableCount: availability.availableCount,
-                ...priceInfo
+                ...priceInfo,
             });
 
             grandTotal += priceInfo.itemTotal;
@@ -72,7 +73,9 @@ const AvailabilityService = {
     },
 
     discover: async (checkInDate: Date, checkOutDate: Date, nights: number) => {
-        const allRoomTypes = await roomTypeRepository.find();
+        const allRoomTypes = await roomTypeRepository.find({
+            relations: ["images"]
+        });
         const results = [];
 
         for (const roomType of allRoomTypes) {
@@ -86,9 +89,11 @@ const AvailabilityService = {
                     name: roomType.name,
                     basePrice: roomType.base_price,
                     totalRooms: availability.totalRooms,
+                    busyCount: availability.busyCount,
                     availableCount: availability.availableCount,
                     capacity: roomType.capacity_people,
-                    priceQuote: priceInfo
+                    priceQuote: priceInfo,
+                    images: roomType.images
                 });
             }
         }

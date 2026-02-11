@@ -1,6 +1,7 @@
 import { AppDataSource } from "../data-source";
 import { RoomType } from "../dto/RoomType";
 import { RoomTypeImage } from "../dto/RoomTypeImage";
+import AvailabilityService from "./Availability.Service";
 
 const roomTypeRepository = AppDataSource.getRepository(RoomType);
 const roomTypeImageRepository = AppDataSource.getRepository(RoomTypeImage);
@@ -57,6 +58,36 @@ const roomTypeService = {
             return await roomTypeRepository.find({
                 relations: ["images"]
             });
+        } catch (error) {
+            throw error;
+        }
+    },
+    getById: async (id: number, checkIn?: string, checkOut?: string) => {
+        try {
+            const roomType = await roomTypeRepository.findOne({
+                where: { id },
+                relations: ["images"]
+            });
+
+            if (!roomType) {
+                throw new Error("Loại phòng không tồn tại");
+            }
+
+            // Default dates if not provided
+            const startDate = checkIn ? new Date(checkIn) : new Date();
+            const endDate = checkOut ? new Date(checkOut) : new Date(new Date().setDate(new Date().getDate() + 1));
+
+            // AvailabilityService is imported inside the method to avoid circular dependencies if any
+            // but here it's safe to import at the top if needed. 
+            // However, AvailabilityService.ts already imports RoomType.ts (the DTO), 
+            // and RoomType.Service.ts also imports RoomType.ts.
+            // Let's check imports.
+            const availability = await AvailabilityService.checkRoomTypeAvailability(id, startDate, endDate);
+
+            return {
+                ...roomType,
+                ...availability
+            };
         } catch (error) {
             throw error;
         }
