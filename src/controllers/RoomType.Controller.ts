@@ -53,6 +53,17 @@ const roomTypeController = {
             console.log("Lỗi khi lấy danh sách loại phòng", error);
             res.status(500).json({ message: "Lỗi khi lấy danh sách loại phòng", error: error.message });
         }
+    },
+    getById: async (req, res) => {
+        try {
+            const id = parseInt(req.params.id as string);
+            const { checkIn, checkOut } = req.query as any;
+            const roomType = await roomTypeService.getById(id, checkIn, checkOut);
+            res.status(200).json({ data: roomType });
+        } catch (error) {
+            console.log("Lỗi khi lấy thông tin loại phòng", error);
+            res.status(500).json({ message: error.message });
+        }
     }
 }
 

@@ -27,6 +27,7 @@ const bookingService = {
             guest_count,
             guest_name,
             guest_phone,
+            guest_email,
             promotion_code,
             note
         } = payload;

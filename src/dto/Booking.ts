@@ -12,6 +12,7 @@ import { Hotel } from "./Hotel";
 import { Promotion } from "./Promotion";
 import { BookingDetail } from "./BookingDetail";
 import { BookingRoom } from "./BookingRoom";
+import { ServiceOrder } from "./ServiceOrder";
 
 @Entity({ name: "bookings" })
 export class Booking {
@@ -51,6 +52,9 @@ export class Booking {
     guest_count: number;
 
     @Column({ nullable: true })
+    guest_email: string;
+
+    @Column({ nullable: true })
     guest_name: string;
 
     @Column({ nullable: true })
@@ -71,4 +75,7 @@ export class Booking {
 
     @OneToMany(() => BookingRoom, (br) => br.booking)
     bookingRooms: BookingRoom[];
+
+    @OneToMany(() => ServiceOrder, (so) => so.booking)
+    serviceOrders: ServiceOrder[];
 }
