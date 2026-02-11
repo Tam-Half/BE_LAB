@@ -8,11 +8,11 @@ import { RoomType } from "../dto/RoomType";
 import { Room } from "../dto/Room";
 import { BookingRoom } from "../dto/BookingRoom";
 import { BookingRoomAllocation } from "../dto/BookingRoomAllocation";
-// <<<<<<< main
-// import AvailabilityService from "./Availability.Service";
-// =======
+
+import AvailabilityService from "./Availability.Service";
+
 import { BookingFilter } from "../interfaces/Booking";
-// >>>>>>> Tam-Vault
+
 
 const bookingRepository = AppDataSource.getRepository(Booking);
 const bookingDetailRepository = AppDataSource.getRepository(BookingDetail);
