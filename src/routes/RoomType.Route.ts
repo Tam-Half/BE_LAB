@@ -5,6 +5,7 @@ import upload from "../middleware/upload";
 const router = Router();
 
 router.get("/", roomTypeController.getAll);
+router.get("/:id", roomTypeController.getById);
 router.post("/", upload.array("images"), roomTypeController.create);
 router.patch("/:id", roomTypeController.update);
 router.delete("/:id", roomTypeController.delete);

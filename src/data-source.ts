@@ -20,6 +20,8 @@ import { Review } from "./dto/Review"
 import { BookingRoomAllocation } from "./dto/BookingRoomAllocation"
 import { Payment } from "./dto/Payment"
 import { BookingRoom } from "./dto/BookingRoom"
+import { ServiceOrder } from "./dto/ServiceOrder"
+import { ExtraService } from "./dto/ExtraService"
 
 dotenv.config()
 
@@ -47,7 +49,9 @@ export const AppDataSource = new DataSource({
         Review,
         BookingRoomAllocation,
         Payment,
-        BookingRoom],
+        BookingRoom,
+        ServiceOrder,
+        ExtraService],
     migrations: [],
     subscribers: [],
 })
