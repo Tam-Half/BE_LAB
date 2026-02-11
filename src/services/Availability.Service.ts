@@ -137,6 +137,26 @@ const AvailabilityService = {
             totalPerNight: nightlyPrice,
             itemTotal,
         };
+    },
+
+    findAvailableRooms: async (roomTypeId: number, checkInDate: Date, checkOutDate: Date, limit: number) => {
+        // Find rooms of type that don't have overlapping allocations
+        const availableRooms = await roomRepository.createQueryBuilder("room")
+            .where("room.room_type_id = :roomTypeId", { roomTypeId })
+            .andWhere((qb) => {
+                const subQuery = qb.subQuery()
+                    .select("allocation.room_id")
+                    .from(BookingRoomAllocation, "allocation")
+                    .where("allocation.check_in_date < :checkOutDate AND allocation.check_out_date > :checkInDate")
+                    .getQuery();
+                return "room.id NOT IN " + subQuery;
+            })
+            .setParameter("checkInDate", checkInDate)
+            .setParameter("checkOutDate", checkOutDate)
+            .limit(limit)
+            .getMany();
+
+        return availableRooms;
     }
 };
 

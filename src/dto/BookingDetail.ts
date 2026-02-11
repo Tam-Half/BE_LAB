@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn } from "typeorm";
 import { Booking } from "./Booking";
 import { RoomType } from "./RoomType";
+import { BookingRoom } from "./BookingRoom";
 
 @Entity({ name: "booking_details" })
 export class BookingDetail {
@@ -20,4 +21,7 @@ export class BookingDetail {
 
     @Column({ type: "decimal", precision: 10, scale: 2, nullable: false })
     price_at_booking: number;
+
+    @OneToMany(() => BookingRoom, (br) => br.bookingDetail)
+    bookingRooms: BookingRoom[];
 }
