@@ -39,7 +39,7 @@ export class Booking {
     @Column({ type: "decimal", precision: 15, scale: 2, nullable: false })
     total_price: number;
 
-    @Column({ nullable: true })
+    @Column({ nullable: false })
     status: string;
 
     @Column({ nullable: false })
