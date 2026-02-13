@@ -8,4 +8,5 @@ router.patch("/:id", roomController.update);
 router.delete("/:id", roomController.delete);
 router.get("/", roomController.getAll);
 router.get("/:id/timeline", roomController.getRoomTimeline);
+router.get("/grid-status", roomController.getRoomGrid);
 export default router;

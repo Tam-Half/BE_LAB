@@ -53,7 +53,7 @@ const roomService = {
         });
     },
 
-     getRoomDetailTimeline: async (roomId: number) => {
+    getRoomDetailTimeline: async (roomId: number) => {
         const now = new Date();
 
         // 1. Lấy thông tin phòng
@@ -102,16 +102,16 @@ const roomService = {
             };
 
             // LOGIC QUAN TRỌNG: Phân loại dựa vào thời gian và status
-            
+
             // Trường hợp 1: Đang ở (Thời gian hiện tại nằm trong khoảng check-in/out VÀ chưa check-out)
             // Hoặc status cụ thể là "CHECKED_IN"
             if (alloc.status === 'CHECKED_IN' || (checkIn <= now && checkOut >= now && alloc.status !== 'CHECKED_OUT')) {
                 timeline.current_booking = bookingData;
-            } 
+            }
             // Trường hợp 2: Tương lai (Chưa đến ngày check-in)
             else if (checkIn > now) {
                 timeline.future_bookings.push(bookingData);
-            } 
+            }
             // Trường hợp 3: Quá khứ (Đã qua ngày check-out hoặc đã set status CHECKED_OUT)
             else {
                 timeline.past_bookings.push(bookingData);
@@ -123,7 +123,50 @@ const roomService = {
 
         return timeline;
     },
-    
+
+
+    getRoomGridStatus: async (floor_id?: number) => {
+        const now = new Date();
+
+        const rooms = await roomRepository.find({
+            where: floor_id ? { floor: { id: floor_id } } : {},
+            relations: [
+                "floor",
+                "roomType",
+                "roomAllocations",
+                "roomAllocations.bookingRoom",
+                "roomAllocations.bookingRoom.booking",
+            ]
+        });
+
+        return rooms.map(room => {
+            // 2. Kiểm tra an toàn: nếu roomAllocations không tồn tại thì gán mảng rỗng
+            const allocations = room.roomAllocations || [];
+
+            const activeAllocation = allocations.find(alloc => {
+                const checkIn = new Date(alloc.check_in_date);
+                const checkOut = new Date(alloc.check_out_date);
+                // Logic kiểm tra trạng thái active
+                return (checkIn <= now && checkOut >= now && alloc.status !== 'CHECKED_OUT') || alloc.status === 'CHECKED_IN';
+            });
+
+            return {
+                id: room.id,
+                romType: {
+                    name: `${room.roomType?.name || 'N/A'} - ${room.room_number}`,
+                    type: room.roomType?.name,
+                    slug: room.roomType?.slug,
+                    descriptions: room.roomType?.description,
+                    base_price: room.roomType?.base_price,
+                    capacity_people: room.roomType?.capacity_people,
+                    price: room.roomType?.base_price,
+                },
+                status: activeAllocation ? "CHECKED_IN" : "NOT_CHECKED_IN",
+                current_guest: activeAllocation?.bookingRoom?.booking?.guest_name || null,
+                floor: room.floor || null
+            };
+        });
+    }
 
 }
 

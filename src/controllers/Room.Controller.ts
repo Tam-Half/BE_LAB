@@ -52,6 +52,17 @@ const roomController = {
         }
     },
 
+    // API: GET /api/rooms/grid-status?floor_id=2
+    getRoomGrid: async ( req , res ) => {
+        try {
+            const floorId = req.query.floor_id ? Number(req.query.floor_id) : undefined;
+            const data = await roomService.getRoomGridStatus(floorId);
+            res.status(200).json(data);
+        } catch (error: any) {
+            res.status(500).json({ message: error.message });
+        }
+    }
+
 }
 
 export default roomController;
