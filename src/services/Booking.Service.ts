@@ -197,7 +197,10 @@ const bookingService = {
     delete: async (id: number) => {
         const result = await bookingRepository.delete(id);
         return result;
-    }
+    },
+
+   
+
 };
 
 export default bookingService;

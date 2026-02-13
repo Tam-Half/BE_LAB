@@ -40,7 +40,18 @@ const roomController = {
             console.log("Lỗi khi lấy danh sách phòng", error);
             res.status(500).json({ message: "Lỗi khi lấy danh sách phòng", error: error.message });
         }
-    }
+    },
+
+    getRoomTimeline: async (req, res) => {
+        try {
+            const roomId = Number(req.params.id);
+            const data = await roomService.getRoomDetailTimeline(roomId);
+            res.status(200).json(data);
+        } catch (error: any) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
 }
 
 export default roomController;
