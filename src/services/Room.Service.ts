@@ -152,15 +152,7 @@ const roomService = {
 
             return {
                 id: room.id,
-                romType: {
-                    name: `${room.roomType?.name || 'N/A'} - ${room.room_number}`,
-                    type: room.roomType?.name,
-                    slug: room.roomType?.slug,
-                    descriptions: room.roomType?.description,
-                    base_price: room.roomType?.base_price,
-                    capacity_people: room.roomType?.capacity_people,
-                    price: room.roomType?.base_price,
-                },
+                roomType: room.roomType,
                 status: activeAllocation ? "CHECKED_IN" : "NOT_CHECKED_IN",
                 current_guest: activeAllocation?.bookingRoom?.booking?.guest_name || null,
                 floor: room.floor || null
