@@ -56,11 +56,9 @@ const roomService = {
     getRoomDetailTimeline: async (roomId: number) => {
         const now = new Date();
 
-        // 1. Lấy thông tin phòng
         const roomInfo = await roomRepository.findOne({ where: { id: roomId }, relations: ["roomType"] });
         if (!roomInfo) throw new Error("Room not found");
 
-        // 2. Lấy toàn bộ lịch sử đặt của phòng này
         const allocations = await allocationRepository.find({
             where: { room: { id: roomId } },
             relations: [
@@ -87,7 +85,6 @@ const roomService = {
             const checkIn = new Date(alloc.check_in_date);
             const checkOut = new Date(alloc.check_out_date);
 
-            // Format dữ liệu trả về cho FE dễ hiển thị
             const bookingData = {
                 allocation_id: alloc.id,
                 booking_id: alloc.bookingRoom?.booking?.id,
@@ -101,24 +98,18 @@ const roomService = {
                 total_booking_price: alloc.bookingRoom?.booking?.total_price
             };
 
-            // LOGIC QUAN TRỌNG: Phân loại dựa vào thời gian và status
 
-            // Trường hợp 1: Đang ở (Thời gian hiện tại nằm trong khoảng check-in/out VÀ chưa check-out)
-            // Hoặc status cụ thể là "CHECKED_IN"
             if (alloc.status === 'CHECKED_IN' || (checkIn <= now && checkOut >= now && alloc.status !== 'CHECKED_OUT')) {
                 timeline.current_booking = bookingData;
             }
-            // Trường hợp 2: Tương lai (Chưa đến ngày check-in)
             else if (checkIn > now) {
                 timeline.future_bookings.push(bookingData);
             }
-            // Trường hợp 3: Quá khứ (Đã qua ngày check-out hoặc đã set status CHECKED_OUT)
             else {
                 timeline.past_bookings.push(bookingData);
             }
         });
 
-        // Sắp xếp lại danh sách quá khứ (Mới nhất lên đầu)
         timeline.past_bookings.sort((a, b) => new Date(b.check_out).getTime() - new Date(a.check_out).getTime());
 
         return timeline;
@@ -140,20 +131,27 @@ const roomService = {
         });
 
         return rooms.map(room => {
-            // 2. Kiểm tra an toàn: nếu roomAllocations không tồn tại thì gán mảng rỗng
             const allocations = room.roomAllocations || [];
 
             const activeAllocation = allocations.find(alloc => {
                 const checkIn = new Date(alloc.check_in_date);
                 const checkOut = new Date(alloc.check_out_date);
-                // Logic kiểm tra trạng thái active
                 return (checkIn <= now && checkOut >= now && alloc.status !== 'CHECKED_OUT') || alloc.status === 'CHECKED_IN';
             });
 
+            let finalStatus = "NOT_CHECKED_IN";
+
+            if (room.status === 'MAINTENANCE') {
+                finalStatus = "MAINTENANCE";
+            }
+            else if (activeAllocation) {
+                finalStatus = "CHECKED_IN";
+            }
             return {
                 id: room.id,
+                room_number: room.room_number,
                 roomType: room.roomType,
-                status: activeAllocation ? "CHECKED_IN" : "NOT_CHECKED_IN",
+                status: finalStatus,
                 current_guest: activeAllocation?.bookingRoom?.booking?.guest_name || null,
                 floor: room.floor || null
             };
