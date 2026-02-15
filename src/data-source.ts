@@ -22,7 +22,7 @@ import { Payment } from "./dto/Payment"
 import { BookingRoom } from "./dto/BookingRoom"
 import { ServiceOrder } from "./dto/ServiceOrder"
 import { ExtraService } from "./dto/ExtraService"
-
+import { Shift } from "./dto/Shift"
 dotenv.config()
 
 export const AppDataSource = new DataSource({
@@ -51,7 +51,8 @@ export const AppDataSource = new DataSource({
         Payment,
         BookingRoom,
         ServiceOrder,
-        ExtraService],
+        ExtraService,
+        Shift],
     migrations: [],
     subscribers: [],
 })

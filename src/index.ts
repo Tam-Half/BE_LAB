@@ -14,7 +14,9 @@ import bookingRouter from "./routes/Booking.Route"
 import paymentRouter from "./routes/Payment.Route"
 import availabilityRouter from "./routes/Availability.Route"
 import extraServiceRouter from "./routes/ExtraService.Route"
+import shiftRouter from "./routes/Shift.Route"; 
 import { authentification } from "./middleware/auth.middleware"
+
 import { initCron } from "./helpers/cron"
 
 const app = express()
@@ -34,7 +36,7 @@ AppDataSource.initialize().then(async () => {
     app.use("/api/payment", paymentRouter)
     app.use("/api/availability", availabilityRouter)
     app.use("/api/extra-service", extraServiceRouter)
-
+    app.use("/api/shifts", shiftRouter);
     initCron()
 
     app.listen(port, () => {
