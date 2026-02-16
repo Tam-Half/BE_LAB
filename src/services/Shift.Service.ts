@@ -6,7 +6,6 @@ import { Booking } from "../dto/Booking";
 import { ServiceOrder } from "../dto/ServiceOrder";
 import { Account } from "../dto/Account";
 
-// Khởi tạo Repository bên ngoài object service
 const shiftRepository = AppDataSource.getRepository(Shift);
 const paymentRepository = AppDataSource.getRepository(Payment);
 const serviceOrderRepository = AppDataSource.getRepository(ServiceOrder);
@@ -19,7 +18,6 @@ const shiftService = {
         try {
             const { staffId, initialCash } = payload;
 
-            // Kiểm tra nhân viên có ca nào chưa đóng không
             const existingShift = await shiftRepository.findOne({
                 where: { staff: { id: staffId }, status: "open" }
             });
@@ -37,18 +35,53 @@ const shiftService = {
             newShift.start_time = new Date();
             newShift.status = "open";
 
-            return await shiftRepository.save(newShift);
+            // Lưu vào DB
+            const savedShift = await shiftRepository.save(newShift);
+
+            // [FIX] Trả về dữ liệu đã lọc bỏ password
+            return {
+                ...savedShift,
+                staff: {
+                    id: staff.id,
+                    username: staff.username,
+                    email: staff.email
+                    // Chỉ lấy những trường bạn muốn hiển thị
+                }
+            };
+
         } catch (error) {
             throw error;
         }
     },
 
-    // 2. Lấy báo cáo thống kê (Dùng chung cho cả xem báo cáo và chốt ca)
+    // 2. Lấy báo cáo thống kê
     getShiftReport: async (shiftId: number) => {
         try {
             const shift = await shiftRepository.findOne({
                 where: { id: shiftId },
-                relations: ["staff"]
+                relations: ["staff"],
+                // [FIX] Dùng select để chỉ lấy các trường cần thiết của staff từ DB
+                select: {
+                    // Chọn các trường của bảng Shift (nếu không chọn, nó sẽ chỉ lấy id)
+                    id: true,
+                    initial_cash: true,
+                    start_time: true,
+                    end_time: true,
+                    status: true,
+                    system_revenue: true,
+                    actual_cash_handover: true,
+                    note: true,
+                    created_at: true,
+                    updated_at: true,
+                    
+                    // Chọn các trường của bảng Staff (Account)
+                    staff: {
+                        id: true,
+                        username: true,
+                        email: true
+                        // Không chọn password, role, is_active...
+                    }
+                }
             });
 
             if (!shift) throw new Error("Không tìm thấy ca làm việc");
@@ -107,7 +140,7 @@ const shiftService = {
         try {
             const { shiftId, actualCash, note } = payload;
             
-            // Gọi hàm getShiftReport ngay trong object này
+            // Gọi hàm getShiftReport (lúc này shift_info bên trong đã sạch password nhờ đoạn select ở trên)
             const report = await shiftService.getShiftReport(shiftId);
             const shift = report.shift_info;
 
