@@ -30,8 +30,8 @@ AppDataSource.initialize().then(async () => {
     app.use("/api/hotel", hotelRouter)
     app.use("/api/room", roomRouter)
     app.use("/api/room-type", roomTypeRouter)
-    app.use("/api/booking", bookingRouter)
-    app.use("/api/payment", paymentRouter)
+    app.use("/api/bookings", bookingRouter)
+    app.use("/api/payments", paymentRouter)
     app.use("/api/availability", availabilityRouter)
     app.use("/api/extra-service", extraServiceRouter)
 

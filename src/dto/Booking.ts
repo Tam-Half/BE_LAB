@@ -64,6 +64,9 @@ export class Booking {
     @JoinColumn({ name: "promotion_id" })
     promotion: Promotion;
 
+    @Column({ type: "bigint", nullable: true, unique: true })
+    order_code: number;
+
     @Column({ type: "timestamp", nullable: true })
     expires_at: Date;
 

@@ -1,7 +1,86 @@
 import { Request, Response } from "express";
 import paymentService from "../services/Payment.Service";
+import bookingService from "../services/Booking.Service";
+import payosService from "../services/PayOS.Service";
+import { AppDataSource } from "../data-source";
+import { Booking } from "../dto/Booking";
 
 const paymentController = {
+    createPayOSLink: async (req: Request, res: Response) => {
+        try {
+            const { booking_id } = req.body;
+            const booking = await bookingService.getById(booking_id);
+            if (!booking) {
+                return res.status(404).json({ message: "Booking not found" });
+            }
+
+            const paymentLink = await payosService.createPaymentLink(booking);
+            res.status(200).json({
+                message: "Payment link created successfully",
+                data: paymentLink
+            });
+        } catch (error) {
+            console.error("Error creating PayOS link:", error);
+            res.status(500).json({ message: error.message || "Error creating payment link" });
+        }
+    },
+
+    handleWebhook: async (req: Request, res: Response) => {
+        try {
+            const webhookData = await payosService.verifyWebhookData(req.body);
+
+            // Check if payment successful
+            if (webhookData.code === "00") {
+                const orderCode = webhookData.orderCode;
+                // Find booking by order_code
+                const booking = await (AppDataSource.getRepository(Booking).findOneBy({ order_code: orderCode }));
+                if (booking) {
+                    await bookingService.confirmPayment(booking.id, webhookData.paymentLinkId);
+                }
+            }
+
+            res.status(200).json({ message: "Webhook processed" });
+        } catch (error) {
+            console.error("Error handling webhook:", error);
+            res.status(200).json({ message: "Webhook received with error" });
+        }
+    },
+
+    verifyPaymentStatus: async (req: Request, res: Response) => {
+        try {
+            const { booking_id } = req.body;
+            const booking = await bookingService.getById(booking_id);
+            if (!booking) {
+                return res.status(404).json({ message: "Booking not found" });
+            }
+
+            if (!booking.order_code) {
+                return res.status(400).json({ message: "No payment link found for this booking" });
+            }
+
+            // Sync with PayOS
+            const paymentDetail = await payosService.getPaymentDetail(Number(booking.order_code));
+
+            if (paymentDetail.status === "PAID") {
+                await bookingService.confirmPayment(booking.id, paymentDetail.id);
+                return res.status(200).json({
+                    message: "Payment confirmed",
+                    status: "PAID",
+                    data: paymentDetail
+                });
+            }
+
+            res.status(200).json({
+                message: "Payment status retrieved",
+                status: paymentDetail.status,
+                data: paymentDetail
+            });
+        } catch (error) {
+            console.error("Error verifying payment status:", error);
+            res.status(500).json({ message: error.message || "Error verifying status" });
+        }
+    },
+
     create: async (req: Request, res: Response) => {
         try {
             const payment = await paymentService.create(req.body);
