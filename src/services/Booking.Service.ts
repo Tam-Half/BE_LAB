@@ -66,6 +66,7 @@ const bookingService = {
                 total_price: 0, // Update later
                 status: "PENDING",
                 payment_status: "unpaid",
+                order_code: Number(String(Date.now()).slice(-6)),
                 expires_at: new Date(Date.now() + 15 * 60 * 1000),
                 note,
                 guest_name,
@@ -199,8 +200,16 @@ const bookingService = {
         return result;
     },
 
-   
+    confirmPayment: async (id: number, transactionId: string) => {
+        const booking = await bookingRepository.findOneBy({ id });
+        if (!booking) throw new Error("Booking not found");
 
+        booking.payment_status = "paid";
+        booking.status = "CONFIRMED";
+        // booking.note = (booking.note || "") + `\nPayment confirmed via PayOS. TransID: ${transactionId}`;
+
+        return await bookingRepository.save(booking);
+    }
 };
 
 export default bookingService;
