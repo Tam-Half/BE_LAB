@@ -54,6 +54,37 @@ const shiftService = {
         }
     },
 
+    // [MỚI] 1b. Lấy thông tin ca hiện tại của nhân viên (Ca đang Open)
+    getCurrentShiftByStaff: async (staffId: string) => {
+        try {
+            const shift = await shiftRepository.findOne({
+                where: { 
+                    staff: { id: staffId }, 
+                    status: "open" // Quan trọng: Chỉ lấy ca đang mở
+                },
+                relations: ["staff"],
+                select: {
+                    // Chọn trường bảng Shift
+                    id: true,
+                    initial_cash: true,
+                    start_time: true,
+                    status: true,
+                    // Chọn trường bảng Staff (loại bỏ password)
+                    staff: {
+                        id: true,
+                        username: true,
+                        email: true
+                    }
+                }
+            });
+
+            // Nếu không có ca nào đang mở, trả về null (để frontend biết mà hiện nút Mở Ca)
+            return shift; 
+        } catch (error) {
+            throw error;
+        }
+    },
+
     // 2. Lấy báo cáo thống kê
     getShiftReport: async (shiftId: number) => {
         try {

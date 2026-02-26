@@ -19,14 +19,22 @@ const authService = {
                 throw new Error("Mật khẩu không chính xác");
             }
             const user = await userRepository.findOne({ where: { account: { id: account.id } } });
+            console.log("User tìm thấy:", user);
             if (!user) {
                 throw new Error("Người dùng không tồn tại");
             }
             const access_token = encrypt.generateAccessToken({ id: user.id, role: account.role });
             const refresh_token = encrypt.generateRefreshToken({ id: user.id, role: account.role });
-            return { access_token, refresh_token };
-        } catch (error) {
-            throw error;
+
+            const accountInfo = {
+                id: account.id,         
+                username: account.username,
+                role: account.role
+            };
+
+            return { user, account: accountInfo, access_token, refresh_token };
+            } catch (error) {
+                throw error;
         }
     }
 }

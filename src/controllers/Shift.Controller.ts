@@ -38,7 +38,23 @@ const shiftController = {
         } catch (error) {
             return res.status(500).json({ message: error.message });
         }
-    }
+    },
+    getCurrentShift: async (req, res) => {
+        try {
+            const staffId = req.query.staffId as string;
+            if (!staffId) {
+                return res.status(400).json({ message: "Thiếu staffId" });
+            }
+            
+            const result = await shiftService.getCurrentShiftByStaff(staffId);
+            
+            // Nếu không tìm thấy (result là null), vẫn trả về 200 nhưng data null
+            // Để frontend biết là "chưa mở ca"
+            return res.status(200).json(result); 
+        } catch (error) {
+            return res.status(500).json({ message: error.message });
+        }
+    },
 }
 
 export default shiftController;

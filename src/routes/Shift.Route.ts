@@ -3,6 +3,7 @@ import shiftController from "../controllers/Shift.Controller";
 
 const shiftRouter = Router();
 
+shiftRouter.get("/current", shiftController.getCurrentShift);
 // 1. Mở ca làm việc
 // Method: POST
 // URL: /api/shifts/start
@@ -19,5 +20,6 @@ shiftRouter.get("/:id", shiftController.getStats);
 // URL: /api/shifts/123/end
 // Body: { "actualCash": 5500000, "note": "Ổn áp" }
 shiftRouter.post("/:id/end", shiftController.endShift);
+
 
 export default shiftRouter;
