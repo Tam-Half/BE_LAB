@@ -5,7 +5,11 @@ import { BookingFilter } from "../interfaces/Booking";
 const bookingController = {
     create: async (req: Request, res: Response) => {
         try {
-            const booking = await bookingService.create(req.body);
+            // Lấy userId từ JWT thông qua middleware authentification
+            const userId = req["currentUser"]?.id;
+            const payload = { ...req.body, user_id: userId || req.body.user_id };
+
+            const booking = await bookingService.create(payload);
             res.status(201).json({ message: "Booking created successfully", data: booking });
         } catch (error) {
             console.error("Error creating booking:", error);

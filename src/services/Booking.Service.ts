@@ -95,7 +95,7 @@ const bookingService = {
                 });
                 const savedDetail = await transactionalEntityManager.save(detail);
 
-                const availableRooms = await AvailabilityService.findAvailableRooms(roomType.id, checkIn, checkOut, roomReq.quantity);
+                const availableRooms = await AvailabilityService.findAvailableRooms(roomType.id, checkIn, checkOut, roomReq.quantity, transactionalEntityManager);
                 if (availableRooms.length < roomReq.quantity) {
                     throw new Error(`Insufficient availability for room type: ${roomType.name}`);
                 }

@@ -111,7 +111,10 @@ const AvailabilityService = {
 
         const busyCount = await allocationRepository.createQueryBuilder("allocation")
             .innerJoin("allocation.room", "room")
+            .innerJoin("allocation.bookingRoom", "bookingRoom")
+            .innerJoin("bookingRoom.booking", "booking")
             .where("room.room_type_id = :roomTypeId", { roomTypeId })
+            .andWhere("booking.status != 'CANCELLED'")
             .andWhere("allocation.check_in_date < :checkOut AND allocation.check_out_date > :checkIn", {
                 checkIn,
                 checkOut
@@ -139,17 +142,22 @@ const AvailabilityService = {
         };
     },
 
-    findAvailableRooms: async (roomTypeId: number, checkInDate: Date, checkOutDate: Date, limit: number) => {
-        // Find rooms of type that don't have overlapping allocations
-        const availableRooms = await roomRepository.createQueryBuilder("room")
+    findAvailableRooms: async (roomTypeId: number, checkInDate: Date, checkOutDate: Date, limit: number, transactionalManager?: any) => {
+        const manager = transactionalManager || AppDataSource.manager;
+
+        // Find rooms of type that don't have overlapping allocations from active bookings
+        const availableRooms = await manager.createQueryBuilder(Room, "room")
             .where("room.room_type_id = :roomTypeId", { roomTypeId })
             .andWhere((qb) => {
                 const subQuery = qb.subQuery()
                     .select("allocation.room_id")
                     .from(BookingRoomAllocation, "allocation")
-                    .where("allocation.check_in_date < :checkOutDate AND allocation.check_out_date > :checkInDate")
+                    .innerJoin("allocation.bookingRoom", "bookingRoom")
+                    .innerJoin("bookingRoom.booking", "booking")
+                    .where("booking.status != 'CANCELLED'")
+                    .andWhere("allocation.check_in_date < :checkOutDate AND allocation.check_out_date > :checkInDate")
                     .getQuery();
-                return "room.id NOT IN " + subQuery;
+                return "room.id NOT IN (" + subQuery + ")";
             })
             .setParameter("checkInDate", checkInDate)
             .setParameter("checkOutDate", checkOutDate)
