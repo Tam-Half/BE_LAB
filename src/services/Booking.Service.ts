@@ -183,7 +183,7 @@ const bookingService = {
     getById: async (id: number) => {
         return await bookingRepository.findOne({
             where: { id },
-            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion"]
+            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion","bookingRooms.allocation"]
         });
     },
 
@@ -209,7 +209,78 @@ const bookingService = {
         // booking.note = (booking.note || "") + `\nPayment confirmed via PayOS. TransID: ${transactionId}`;
 
         return await bookingRepository.save(booking);
-    }
+    }, 
+
+    updateRoomStatus: async (bookingId: number, allocationId: number, targetStatus: string) => {
+        return await AppDataSource.transaction(async (transactionalEntityManager) => {
+            // 1. Validate trạng thái hợp lệ
+            const validStatuses = ["CHECKED_IN", "CHECKED_OUT"];
+            if (!validStatuses.includes(targetStatus)) {
+                throw new Error("Trạng thái không hợp lệ. Chỉ chấp nhận CHECKED_IN hoặc CHECKED_OUT.");
+            }
+
+            // 2. Tìm bản ghi Allocation cụ thể
+            const allocation = await transactionalEntityManager.findOne(BookingRoomAllocation, {
+                where: { id: allocationId },
+                relations: ["bookingRoom", "bookingRoom.booking"]
+            });
+
+            if (!allocation) {
+                throw new Error("Không tìm thấy thông tin phân bổ phòng (Allocation) này.");
+            }
+
+            if (allocation.bookingRoom.booking.id !== bookingId) {
+                throw new Error("Phòng này không thuộc về mã đặt phòng yêu cầu.");
+            }
+
+            // 3. Logic chặn lỗi nghiệp vụ (Guard clauses)
+            if (targetStatus === "CHECKED_OUT" && allocation.status !== "CHECKED_IN") {
+                throw new Error("Không thể trả phòng (Check-out) khi phòng chưa được nhận (Check-in).");
+            }
+            if (targetStatus === "CHECKED_IN" && allocation.status === "CHECKED_OUT") {
+                throw new Error("Phòng này đã được trả (Check-out), không thể nhận lại.");
+            }
+            if (allocation.status === targetStatus) {
+                throw new Error(`Phòng này đã ở trạng thái ${targetStatus} từ trước.`);
+            }
+
+            // 4. Cập nhật trạng thái của phòng đó
+            allocation.status = targetStatus;
+            await transactionalEntityManager.save(allocation);
+
+            // 5. LOGIC NÂNG CAO: Tự động cập nhật trạng thái Booking mẹ
+            const booking = await transactionalEntityManager.findOne(Booking, {
+                where: { id: bookingId },
+                relations: ["bookingRooms", "bookingRooms.allocation"]
+            });
+
+            if (booking) {
+                const allAllocations = booking.bookingRooms.map(br => br.allocation);
+
+                if (targetStatus === "CHECKED_IN") {
+                    // Nếu khách bắt đầu nhận phòng đầu tiên -> Chuyển Booking thành CHECKED_IN
+                    if (booking.status !== "CHECKED_IN") {
+                        booking.status = "CHECKED_IN";
+                        await transactionalEntityManager.save(booking);
+                    }
+                } else if (targetStatus === "CHECKED_OUT") {
+                    // Nếu trả phòng, kiểm tra xem TẤT CẢ các phòng đã trả hết chưa?
+                    const isAllCheckedOut = allAllocations.every(a => a.status === "CHECKED_OUT");
+                    if (isAllCheckedOut) {
+                        booking.status = "COMPLETED"; // Hoặc "CHECKED_OUT" tùy định nghĩa DB của bạn
+                        await transactionalEntityManager.save(booking);
+                    }
+                }
+            }
+
+            return {
+                message: `Cập nhật trạng thái phòng thành ${targetStatus} thành công`,
+                allocation_id: allocation.id,
+                room_status: allocation.status,
+                parent_booking_status: booking?.status
+            };
+        });
+    },
 };
 
 export default bookingService;

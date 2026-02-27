@@ -74,7 +74,24 @@ const bookingController = {
             console.error("Error deleting booking:", error);
             res.status(500).json({ message: "Error deleting booking" });
         }
+    },
+    // Trong BookingController
+    updateRoomStatus: async (req: Request, res: Response) => {
+        try {
+            const bookingId = parseInt(req.params.bookingId as string);
+            const { allocationId, status } = req.body;
+
+            if (!allocationId || !status) {
+                return res.status(400).json({ error: "Thiếu allocationId hoặc status" });
+            }
+
+            const result = await bookingService.updateRoomStatus(bookingId, allocationId, status);
+            res.status(200).json(result);
+        } catch (error: any) {
+            res.status(400).json({ error: error.message });
+        }
     }
+
 };
 
 export default bookingController;
