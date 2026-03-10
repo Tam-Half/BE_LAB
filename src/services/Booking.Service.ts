@@ -8,6 +8,8 @@ import { RoomType } from "../dto/RoomType";
 import { Room } from "../dto/Room";
 import { BookingRoom } from "../dto/BookingRoom";
 import { BookingRoomAllocation } from "../dto/BookingRoomAllocation";
+import { ServiceOrder } from "../dto/ServiceOrder";
+import { ExtraService } from "../dto/ExtraService";
 import AvailabilityService from "./Availability.Service";
 import { BookingFilter } from "../interfaces/Booking";
 
@@ -19,6 +21,8 @@ const promotionRepository = AppDataSource.getRepository(Promotion);
 const roomTypeRepository = AppDataSource.getRepository(RoomType);
 const roomRepository = AppDataSource.getRepository(Room);
 const allocationRepository = AppDataSource.getRepository(BookingRoomAllocation);
+const extraServiceRepository = AppDataSource.getRepository(ExtraService);
+const serviceOrderRepository = AppDataSource.getRepository(ServiceOrder);
 
 const bookingService = {
     create: async (payload: any) => {
@@ -31,6 +35,7 @@ const bookingService = {
             guest_phone,
             guest_email,
             promotion_code,
+            extra_services, // Array of { service_id, quantity }
             note
         } = payload;
 
@@ -137,6 +142,37 @@ const bookingService = {
 
             savedBooking.total_price = calculatedTotalPrice;
             await transactionalEntityManager.save(savedBooking);
+
+            // 5. Create Service Orders (Extra Services)
+            if (extra_services && extra_services.length > 0) {
+                for (const svcReq of extra_services) {
+                    const service = await extraServiceRepository.findOneBy({ id: svcReq.service_id });
+                    if (!service) continue;
+
+                    const unitPrice = Number(service.base_price) || 0;
+                    const quantity = svcReq.quantity || 1;
+                    const svcTotal = unitPrice * quantity;
+
+                    const serviceOrder = transactionalEntityManager.create(ServiceOrder, {
+                        booking: savedBooking,
+                        service: service,
+                        service_name_snapshot: service.name,
+                        quantity: quantity,
+                        unit_price: unitPrice,
+                        total_price: svcTotal,
+                        status: "pending"
+                    });
+                    await transactionalEntityManager.save(serviceOrder);
+
+                    // Add to total booking price (optional, depending on business logic)
+                    // If room price already covers it or if it's separate
+                    calculatedTotalPrice += svcTotal;
+                }
+
+                // Final price update including services
+                savedBooking.total_price = calculatedTotalPrice;
+                await transactionalEntityManager.save(savedBooking);
+            }
 
             return await transactionalEntityManager.findOne(Booking, {
                 where: { id: savedBooking.id },
