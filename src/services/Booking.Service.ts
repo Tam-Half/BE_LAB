@@ -206,20 +206,17 @@ const bookingService = {
 
         booking.payment_status = "paid";
         booking.status = "CONFIRMED";
-        // booking.note = (booking.note || "") + `\nPayment confirmed via PayOS. TransID: ${transactionId}`;
 
         return await bookingRepository.save(booking);
     }, 
 
     updateRoomStatus: async (bookingId: number, allocationId: number, targetStatus: string) => {
         return await AppDataSource.transaction(async (transactionalEntityManager) => {
-            // 1. Validate trạng thái hợp lệ
             const validStatuses = ["CHECKED_IN", "CHECKED_OUT"];
             if (!validStatuses.includes(targetStatus)) {
                 throw new Error("Trạng thái không hợp lệ. Chỉ chấp nhận CHECKED_IN hoặc CHECKED_OUT.");
             }
 
-            // 2. Tìm bản ghi Allocation cụ thể
             const allocation = await transactionalEntityManager.findOne(BookingRoomAllocation, {
                 where: { id: allocationId },
                 relations: ["bookingRoom", "bookingRoom.booking"]
@@ -233,7 +230,6 @@ const bookingService = {
                 throw new Error("Phòng này không thuộc về mã đặt phòng yêu cầu.");
             }
 
-            // 3. Logic chặn lỗi nghiệp vụ (Guard clauses)
             if (targetStatus === "CHECKED_OUT" && allocation.status !== "CHECKED_IN") {
                 throw new Error("Không thể trả phòng (Check-out) khi phòng chưa được nhận (Check-in).");
             }
@@ -244,11 +240,9 @@ const bookingService = {
                 throw new Error(`Phòng này đã ở trạng thái ${targetStatus} từ trước.`);
             }
 
-            // 4. Cập nhật trạng thái của phòng đó
             allocation.status = targetStatus;
             await transactionalEntityManager.save(allocation);
 
-            // 5. LOGIC NÂNG CAO: Tự động cập nhật trạng thái Booking mẹ
             const booking = await transactionalEntityManager.findOne(Booking, {
                 where: { id: bookingId },
                 relations: ["bookingRooms", "bookingRooms.allocation"]
