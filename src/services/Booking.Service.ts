@@ -210,7 +210,7 @@ const bookingService = {
 
         return await bookingRepository.find({
             where: whereCondition,
-            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion"],
+            relations: ["bookingDetails", "bookingDetails.roomType", "bookingDetails.roomType.images", "user", "hotel", "promotion"],
             order: { created_at: "DESC" } // Thường booking nên hiện cái mới nhất lên đầu
         });
     },

@@ -19,13 +19,16 @@ const bookingController = {
 
     getAll: async (req: Request, res: Response) => {
         try {
-            // Lấy các tham số từ URL query: /bookings?status=PENDING&user_id=5
+            // Lấy userId từ JWT thông qua middleware authentification
+            const currentUserId = req["currentUser"]?.id;
+
+            // Lấy các tham số từ URL query
             const { status, user_id, hotel_id } = req.query;
 
             // Đóng gói thành object filter
             const filters: BookingFilter = {
                 status: status as string,
-                user_id: user_id ? Number(user_id) : undefined,
+                user_id: currentUserId || (user_id ? Number(user_id) : undefined),
                 hotel_id: hotel_id ? Number(hotel_id) : undefined,
             };
 
