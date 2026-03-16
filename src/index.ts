@@ -14,6 +14,7 @@ import bookingRouter from "./routes/Booking.Route"
 import paymentRouter from "./routes/Payment.Route"
 import availabilityRouter from "./routes/Availability.Route"
 import extraServiceRouter from "./routes/ExtraService.Route"
+import chatRouter from "./routes/Chat.Route"
 import { authentification } from "./middleware/auth.middleware"
 import { initCron } from "./helpers/cron"
 
@@ -34,6 +35,7 @@ AppDataSource.initialize().then(async () => {
     app.use("/api/payments", paymentRouter)
     app.use("/api/availability", availabilityRouter)
     app.use("/api/extra-service", extraServiceRouter)
+    app.use("/api/chat", chatRouter)
 
     initCron()
 
