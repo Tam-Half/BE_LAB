@@ -17,11 +17,13 @@ import extraServiceRouter from "./routes/ExtraService.Route"
 import chatRouter from "./routes/Chat.Route"
 import { authentification } from "./middleware/auth.middleware"
 import { initCron } from "./helpers/cron"
+import { loggingMiddleware } from "./middleware/loggin.middleware"
 
 const app = express()
 const port = 3000
 app.use(express.json())
 app.use(cors())
+app.use(loggingMiddleware)
 
 AppDataSource.initialize().then(async () => {
 
