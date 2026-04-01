@@ -15,14 +15,17 @@ import paymentRouter from "./routes/Payment.Route"
 import availabilityRouter from "./routes/Availability.Route"
 import extraServiceRouter from "./routes/ExtraService.Route"
 import shiftRouter from "./routes/Shift.Route"; 
+import chatRouter from "./routes/Chat.Route"
 import { authentification } from "./middleware/auth.middleware"
 
 import { initCron } from "./helpers/cron"
+import { loggingMiddleware } from "./middleware/loggin.middleware"
 
 const app = express()
 const port = 3000
 app.use(express.json())
 app.use(cors())
+app.use(loggingMiddleware)
 
 AppDataSource.initialize().then(async () => {
 
@@ -37,6 +40,8 @@ AppDataSource.initialize().then(async () => {
     app.use("/api/availability", availabilityRouter)
     app.use("/api/extra-service", extraServiceRouter)
     app.use("/api/shifts", shiftRouter);
+    app.use("/api/chat", chatRouter)
+
     initCron()
 
     app.listen(port, () => {

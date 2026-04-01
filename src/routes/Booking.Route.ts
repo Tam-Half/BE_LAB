@@ -4,8 +4,8 @@ import { authentification } from "../middleware/auth.middleware";
 
 const router = Router();
 
-router.post("/", bookingController.create);
-router.get("/", bookingController.getAll);
+router.post("/", authentification, bookingController.create);
+router.get("/", authentification, bookingController.getAll);
 router.get("/:id", bookingController.getById);
 router.put("/:id", bookingController.update);
 router.delete("/:id", bookingController.delete);

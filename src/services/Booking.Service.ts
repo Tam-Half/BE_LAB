@@ -146,11 +146,13 @@ const bookingService = {
             // 5. Create Service Orders (Extra Services)
             if (extra_services && extra_services.length > 0) {
                 for (const svcReq of extra_services) {
-                    const service = await extraServiceRepository.findOneBy({ id: svcReq.service_id });
+                    // Handle both { service_id, quantity } and simple service_id (number)
+                    const svcId = typeof svcReq === 'object' ? svcReq.service_id : svcReq;
+                    const service = await extraServiceRepository.findOneBy({ id: svcId });
                     if (!service) continue;
 
                     const unitPrice = Number(service.base_price) || 0;
-                    const quantity = svcReq.quantity || 1;
+                    const quantity = (typeof svcReq === 'object' ? svcReq.quantity : 1) || 1;
                     const svcTotal = unitPrice * quantity;
 
                     const serviceOrder = transactionalEntityManager.create(ServiceOrder, {
@@ -184,7 +186,9 @@ const bookingService = {
                     "bookingRooms.allocation.room",
                     "user",
                     "hotel",
-                    "promotion"
+                    "promotion",
+                    "serviceOrders",
+                    "serviceOrders.service"
                 ]
             });
         });
@@ -210,7 +214,7 @@ const bookingService = {
 
         return await bookingRepository.find({
             where: whereCondition,
-            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion"],
+            relations: ["bookingDetails", "bookingDetails.roomType", "bookingDetails.roomType.images", "user", "hotel", "promotion", "serviceOrders", "serviceOrders.service"],
             order: { created_at: "DESC" } // Thường booking nên hiện cái mới nhất lên đầu
         });
     },
@@ -219,7 +223,7 @@ const bookingService = {
     getById: async (id: number) => {
         return await bookingRepository.findOne({
             where: { id },
-            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion","bookingRooms.allocation"]
+            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion", "serviceOrders", "serviceOrders.service"]
         });
     },
 
