@@ -8,6 +8,7 @@ router.post("/", authentification, bookingController.create);
 router.get("/", authentification, bookingController.getAll);
 router.get("/:id", bookingController.getById);
 router.put("/:id", bookingController.update);
+router.post("/:id/cancel", authentification, bookingController.cancel);
 router.delete("/:id", bookingController.delete);
 
 export default router;

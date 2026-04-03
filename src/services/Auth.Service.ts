@@ -2,6 +2,7 @@ import { encrypt } from "../helpers/helpers";
 import { AppDataSource } from "../data-source";
 import { Account } from "../dto/Account";
 import { User } from "../dto/User";
+import { UserRole } from "../dto/Enums";
 
 const accountRepository = AppDataSource.getRepository(Account);
 const userRepository = AppDataSource.getRepository(User);
@@ -22,8 +23,8 @@ const authService = {
             if (!user) {
                 throw new Error("Người dùng không tồn tại");
             }
-            const access_token = encrypt.generateAccessToken({ id: user.id, role: account.role });
-            const refresh_token = encrypt.generateRefreshToken({ id: user.id, role: account.role });
+            const access_token = encrypt.generateAccessToken({ id: user.id, role: account.role as UserRole });
+            const refresh_token = encrypt.generateRefreshToken({ id: user.id, role: account.role as UserRole });
             return { access_token, refresh_token };
         } catch (error) {
             throw error;

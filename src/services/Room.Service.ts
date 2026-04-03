@@ -2,6 +2,7 @@ import { AppDataSource } from "../data-source";
 import { Room } from "../dto/Room";
 import { Floor } from "../dto/Floor";
 import { RoomType } from "../dto/RoomType";
+import { RoomStatus } from "../dto/Enums";
 
 const roomRepository = AppDataSource.getRepository(Room);
 const floorRepository = AppDataSource.getRepository(Floor);

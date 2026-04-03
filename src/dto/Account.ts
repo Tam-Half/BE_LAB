@@ -9,6 +9,7 @@ import {
     OneToOne,
     JoinColumn,
 } from "typeorm";
+import { UserRole } from "./Enums";
 
 @Entity({ name: "accounts" })
 export class Account {
@@ -24,8 +25,12 @@ export class Account {
     @Column({ nullable: false })
     password: string;
 
-    @Column({ default: "user" })
-    role: string;
+    @Column({
+        type: "enum",
+        enum: UserRole,
+        default: UserRole.USER
+    })
+    role: UserRole;
 
     @Column({ nullable: false })
     is_active: boolean;
