@@ -4,7 +4,6 @@ const authController = {
     login: async (req, res) => {
         try {
             const payload = req.body;
-            console.log(payload)
             const result = await authService.login(payload);
             return res.status(200).json(result);
         } catch (error) {

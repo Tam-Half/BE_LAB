@@ -23,13 +23,24 @@ const bookingController = {
             const currentUserId = req["currentUser"]?.id;
 
             // Lấy các tham số từ URL query
-            const { status, user_id, hotel_id } = req.query;
+            const { status, user_id, hotel_id, booking_code } = req.query;
+
+            // Kiểm tra quyền: 
+            // - Nếu là USER: Chỉ xem được booking của chính mình
+            // - Nếu là STAFF/ADMIN: Xem được tất cả hoặc lọc theo user_id được truyền lên
+            const currentUserRole = req["currentUser"]?.role;
+            let targetUserId = user_id ? (user_id as string) : undefined;
+
+            if (currentUserRole === "user") {
+                targetUserId = currentUserId;
+            }
 
             // Đóng gói thành object filter
             const filters: BookingFilter = {
                 status: status as string,
-                user_id: currentUserId || (user_id ? Number(user_id) : undefined),
+                user_id: targetUserId as any,
                 hotel_id: hotel_id ? Number(hotel_id) : undefined,
+                booking_code: booking_code as string,
             };
 
             const bookings = await bookingService.getAll(filters);

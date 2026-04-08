@@ -6,4 +6,5 @@ export interface BookingFilter {
     end_date?: string;
     page?: number;   // Dùng cho phân trang
     limit?: number;  // Dùng cho phân trang
+    booking_code?: string;
 }

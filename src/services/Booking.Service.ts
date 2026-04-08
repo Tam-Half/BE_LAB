@@ -172,8 +172,16 @@ const bookingService = {
                     calculatedTotalPrice += svcTotal;
                 }
 
-                // Final price update including services
-                savedBooking.total_price = calculatedTotalPrice;
+                // Final price update including services and 8% VAT
+                const subtotal = calculatedTotalPrice;
+                const vat = subtotal * 0.08;
+                savedBooking.total_price = subtotal + vat;
+                await transactionalEntityManager.save(savedBooking);
+            } else {
+                // Apply VAT even if no extra services
+                const subtotal = calculatedTotalPrice;
+                const vat = subtotal * 0.08;
+                savedBooking.total_price = subtotal + vat;
                 await transactionalEntityManager.save(savedBooking);
             }
 
@@ -196,7 +204,7 @@ const bookingService = {
     },
 
     getAll: async (filters: BookingFilter) => {
-        const { status, user_id, hotel_id } = filters;
+        const { status, user_id, hotel_id, booking_code } = filters;
 
         // Xây dựng điều kiện lọc động
         const whereCondition: any = {};
@@ -211,6 +219,10 @@ const bookingService = {
 
         if (hotel_id) {
             whereCondition.hotel = { id: hotel_id };
+        }
+
+        if (booking_code) {
+            whereCondition.booking_code = booking_code;
         }
 
         return await bookingRepository.find({
@@ -282,7 +294,7 @@ const bookingService = {
 
             if (diffDays > 3) {
                 refundAmount = Number(booking.total_price) * 0.5;
-                message = `Hủy đơn đặt thành công, vui lòng liên hệ hotline của khách sạn để nhận lại ${refundAmount.toLocaleString('vi-VN')} VND (50% giá trị đơn đặt)`;
+                message = `Hủy đơn đặt thành công, vui lòng liên hệ hotline của khách sạn để nhận lại ${refundAmount.toLocaleString('vi-VN')} VND `;
             } else {
                 message = "Hủy đơn đặt thành công, bạn sẽ không được hoàn lại tiền đơn hàng này do thời gian hủy quá sát ngày check-in";
             }
