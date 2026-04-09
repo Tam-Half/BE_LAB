@@ -257,15 +257,18 @@ const bookingService = {
         const booking = await bookingRepository.findOneBy({ id });
         if (!booking) throw new Error("Booking not found");
 
-        booking.payment_status = "paid";
-        booking.status = "CONFIRMED";
+        // Sử dụng chuẩn Enum thay vì chuỗi
+        booking.payment_status = PaymentStatus.PAID;
+        booking.status = BookingStatus.CONFIRMED;
 
         return await bookingRepository.save(booking);
-    }, 
+    },
 
-    updateRoomStatus: async (bookingId: number, allocationId: number, targetStatus: string) => {
+    updateRoomStatus: async (bookingId: number, allocationId: number, targetStatus: BookingRoomAllocationStatus) => {
         return await AppDataSource.transaction(async (transactionalEntityManager) => {
-            const validStatuses = ["CHECKED_IN", "CHECKED_OUT"];
+            const validStatuses = [BookingRoomAllocationStatus.CHECKED_IN, BookingRoomAllocationStatus.CHECKED_OUT];
+
+            // Ép kiểu targetStatus về enum để so sánh an toàn
             if (!validStatuses.includes(targetStatus)) {
                 throw new Error("Trạng thái không hợp lệ. Chỉ chấp nhận CHECKED_IN hoặc CHECKED_OUT.");
             }
@@ -283,10 +286,11 @@ const bookingService = {
                 throw new Error("Phòng này không thuộc về mã đặt phòng yêu cầu.");
             }
 
-            if (targetStatus === "CHECKED_OUT" && allocation.status !== "CHECKED_IN") {
+            // Thay thế TOÀN BỘ chuỗi cứng bằng Enum
+            if (targetStatus === BookingRoomAllocationStatus.CHECKED_OUT && allocation.status !== BookingRoomAllocationStatus.CHECKED_IN) {
                 throw new Error("Không thể trả phòng (Check-out) khi phòng chưa được nhận (Check-in).");
             }
-            if (targetStatus === "CHECKED_IN" && allocation.status === "CHECKED_OUT") {
+            if (targetStatus === BookingRoomAllocationStatus.CHECKED_IN && allocation.status === BookingRoomAllocationStatus.CHECKED_OUT) {
                 throw new Error("Phòng này đã được trả (Check-out), không thể nhận lại.");
             }
             if (allocation.status === targetStatus) {
@@ -304,23 +308,21 @@ const bookingService = {
             if (booking) {
                 const allAllocations = booking.bookingRooms.map(br => br.allocation);
 
-                if (targetStatus === "CHECKED_IN") {
+                if (targetStatus === BookingRoomAllocationStatus.CHECKED_IN) {
                     // Nếu khách bắt đầu nhận phòng đầu tiên -> Chuyển Booking thành CHECKED_IN
-                    if (booking.status !== "CHECKED_IN") {
-                        booking.status = "CHECKED_IN";
+                    if (booking.status !== BookingStatus.CHECKED_IN) {
+                        booking.status = BookingStatus.CHECKED_IN;
                         await transactionalEntityManager.save(booking);
                     }
-                } else if (targetStatus === "CHECKED_OUT") {
+                } else if (targetStatus === BookingRoomAllocationStatus.CHECKED_OUT) {
                     // Nếu trả phòng, kiểm tra xem TẤT CẢ các phòng đã trả hết chưa?
-                    const isAllCheckedOut = allAllocations.every(a => a.status === "CHECKED_OUT");
-                    if (isAllCheckedOut) {
-                        booking.status = "COMPLETED"; // Hoặc "CHECKED_OUT" tùy định nghĩa DB của bạn
-                        await transactionalEntityManager.save(booking);
-        booking.payment_status = PaymentStatus.PAID;
-        booking.status = BookingStatus.CONFIRMED;
-        // booking.note = (booking.note || "") + `\nPayment confirmed via PayOS. TransID: ${transactionId}`;
+                    const isAllCheckedOut = allAllocations.every(a => a.status === BookingRoomAllocationStatus.CHECKED_OUT);
 
-        return await bookingRepository.save(booking);
+                    if (isAllCheckedOut) {
+                        booking.status = BookingStatus.COMPLETED;
+
+                        // Đã xóa phần copy-paste lỗi ở đây. Chỉ dùng transactionalEntityManager.
+                        await transactionalEntityManager.save(booking);
                     }
                 }
             }
@@ -328,6 +330,7 @@ const bookingService = {
             return allocation;
         });
     },
+
 
     cancel: async (id: number, currentUser: any) => {
         return await AppDataSource.transaction(async (transactionalEntityManager) => {

@@ -5,6 +5,7 @@ import { Payment } from "../dto/Payment";
 import { Booking } from "../dto/Booking";
 import { ServiceOrder } from "../dto/ServiceOrder";
 import { Account } from "../dto/Account";
+import { BookingStatus, BookingRoomAllocationStatus, ServiceOrderStatus, PaymentStatus } from "../dto/Enums";
 
 const shiftRepository = AppDataSource.getRepository(Shift);
 const paymentRepository = AppDataSource.getRepository(Payment);
@@ -86,14 +87,12 @@ const shiftService = {
     },
 
     // 2. Lấy báo cáo thống kê
-    getShiftReport: async (shiftId: number) => {
+   getShiftReport: async (shiftId: number) => {
         try {
             const shift = await shiftRepository.findOne({
                 where: { id: shiftId },
                 relations: ["staff"],
-                // [FIX] Dùng select để chỉ lấy các trường cần thiết của staff từ DB
                 select: {
-                    // Chọn các trường của bảng Shift (nếu không chọn, nó sẽ chỉ lấy id)
                     id: true,
                     initial_cash: true,
                     start_time: true,
@@ -104,13 +103,10 @@ const shiftService = {
                     note: true,
                     created_at: true,
                     updated_at: true,
-                    
-                    // Chọn các trường của bảng Staff (Account)
                     staff: {
                         id: true,
                         username: true,
                         email: true
-                        // Không chọn password, role, is_active...
                     }
                 }
             });
@@ -121,8 +117,12 @@ const shiftService = {
             const endTime = shift.end_time ? shift.end_time : new Date();
 
             // A. Doanh thu Payment
+            // [SỬA LỖI] Thay vì dùng chuỗi "completed", hãy dùng Enum PaymentStatus.PAID
             const payments = await paymentRepository.find({
-                where: { created_at: Between(startTime, endTime), status: "completed" }
+                where: { 
+                    created_at: Between(startTime, endTime), 
+                    status: PaymentStatus.PAID // <-- Sửa tại đây
+                }
             });
 
             const cashRevenue = payments
@@ -139,6 +139,7 @@ const shiftService = {
                 relations: ["user"]
             });
 
+            // Lưu ý: Đảm bảo các relation name này khớp chính xác với entity của bạn
             const serviceOrders = await serviceOrderRepository.find({
                 where: { created_at: Between(startTime, endTime) },
                 relations: ["booking", "booking.bookingRooms", "booking.bookingRooms.allocation.room"]
