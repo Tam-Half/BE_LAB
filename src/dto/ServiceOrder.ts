@@ -9,6 +9,7 @@ import {
 } from "typeorm";
 import { Booking } from "./Booking";
 import { ExtraService } from "./ExtraService";
+import { ServiceOrderStatus } from "./Enums";
 
 @Entity({ name: "service_orders" })
 export class ServiceOrder {
@@ -36,8 +37,12 @@ export class ServiceOrder {
     @Column({ type: "decimal", precision: 15, scale: 2, nullable: false })
     total_price: number;
 
-    @Column({ default: "pending" }) // pending, fulfilled, cancelled
-    status: string;
+    @Column({
+        type: "enum",
+        enum: ServiceOrderStatus,
+        default: ServiceOrderStatus.PENDING
+    })
+    status: ServiceOrderStatus;
 
     @Column({ type: "text", nullable: true })
     note: string;

@@ -12,6 +12,7 @@ import { ServiceOrder } from "../dto/ServiceOrder";
 import { ExtraService } from "../dto/ExtraService";
 import AvailabilityService from "./Availability.Service";
 import { BookingFilter } from "../interfaces/Booking";
+import { BookingStatus, BookingRoomAllocationStatus, ServiceOrderStatus, PaymentStatus } from "../dto/Enums";
 
 const bookingRepository = AppDataSource.getRepository(Booking);
 const bookingDetailRepository = AppDataSource.getRepository(BookingDetail);
@@ -69,9 +70,9 @@ const bookingService = {
                 check_in_date: checkIn,
                 check_out_date: checkOut,
                 total_price: 0, // Update later
-                status: "PENDING",
-                payment_status: "unpaid",
-                order_code: Number(String(Date.now()).slice(-6)),
+                status: BookingStatus.PENDING,
+                payment_status: PaymentStatus.PENDING,
+                order_code: Number(String(Date.now())),
                 expires_at: new Date(Date.now() + 15 * 60 * 1000),
                 note,
                 guest_name,
@@ -128,7 +129,7 @@ const bookingService = {
                         check_in_date: checkIn,
                         check_out_date: checkOut,
                         price_at_booking: basePrice,
-                        status: "NOT_CHECKED_IN"
+                        status: BookingRoomAllocationStatus.NOT_CHECKED_IN
                     });
                     await transactionalEntityManager.save(allocation);
                 }
@@ -162,7 +163,7 @@ const bookingService = {
                         quantity: quantity,
                         unit_price: unitPrice,
                         total_price: svcTotal,
-                        status: "pending"
+                        status: ServiceOrderStatus.PENDING
                     });
                     await transactionalEntityManager.save(serviceOrder);
 
@@ -171,8 +172,16 @@ const bookingService = {
                     calculatedTotalPrice += svcTotal;
                 }
 
-                // Final price update including services
-                savedBooking.total_price = calculatedTotalPrice;
+                // Final price update including services and 8% VAT
+                const subtotal = calculatedTotalPrice;
+                const vat = subtotal * 0.08;
+                savedBooking.total_price = subtotal + vat;
+                await transactionalEntityManager.save(savedBooking);
+            } else {
+                // Apply VAT even if no extra services
+                const subtotal = calculatedTotalPrice;
+                const vat = subtotal * 0.08;
+                savedBooking.total_price = subtotal + vat;
                 await transactionalEntityManager.save(savedBooking);
             }
 
@@ -195,7 +204,7 @@ const bookingService = {
     },
 
     getAll: async (filters: BookingFilter) => {
-        const { status, user_id, hotel_id } = filters;
+        const { status, user_id, hotel_id, booking_code } = filters;
 
         // Xây dựng điều kiện lọc động
         const whereCondition: any = {};
@@ -210,6 +219,10 @@ const bookingService = {
 
         if (hotel_id) {
             whereCondition.hotel = { id: hotel_id };
+        }
+
+        if (booking_code) {
+            whereCondition.booking_code = booking_code;
         }
 
         return await bookingRepository.find({
@@ -303,18 +316,85 @@ const bookingService = {
                     if (isAllCheckedOut) {
                         booking.status = "COMPLETED"; // Hoặc "CHECKED_OUT" tùy định nghĩa DB của bạn
                         await transactionalEntityManager.save(booking);
+        booking.payment_status = PaymentStatus.PAID;
+        booking.status = BookingStatus.CONFIRMED;
+        // booking.note = (booking.note || "") + `\nPayment confirmed via PayOS. TransID: ${transactionId}`;
+
+        return await bookingRepository.save(booking);
+                    }
+                }
+            }
+
+            return allocation;
+        });
+    },
+
+    cancel: async (id: number, currentUser: any) => {
+        return await AppDataSource.transaction(async (transactionalEntityManager) => {
+            const booking = await transactionalEntityManager.findOne(Booking, {
+                where: { id },
+                relations: ["user", "bookingRooms", "bookingRooms.allocation", "serviceOrders"]
+            });
+
+            if (!booking) throw new Error("Booking not found");
+
+            // Permission check: Owner or Admin
+            if (currentUser.role !== 'admin' && booking.user.id !== currentUser.id) {
+                throw new Error("You do not have permission to cancel this booking");
+            }
+
+            // Status check: Only allow PENDING or CONFIRMED to be cancelled
+            const ALLOWED_STATUSES = [BookingStatus.PENDING, BookingStatus.CONFIRMED];
+            if (!ALLOWED_STATUSES.includes(booking.status)) {
+                throw new Error(`Cannot cancel booking with status: ${booking.status}. Only PENDING or CONFIRMED bookings can be cancelled.`);
+            }
+
+            const now = new Date();
+            const checkIn = new Date(booking.check_in_date);
+            const diffTime = checkIn.getTime() - now.getTime();
+            const diffDays = diffTime / (1000 * 3600 * 24);
+
+            let message = "";
+            let refundAmount = 0;
+
+            if (diffDays > 3) {
+                refundAmount = Number(booking.total_price) * 0.5;
+                message = `Hủy đơn đặt thành công, vui lòng liên hệ hotline của khách sạn để nhận lại ${refundAmount.toLocaleString('vi-VN')} VND `;
+            } else {
+                message = "Hủy đơn đặt thành công, bạn sẽ không được hoàn lại tiền đơn hàng này do thời gian hủy quá sát ngày check-in";
+            }
+
+            // Update statuses
+            booking.status = BookingStatus.CANCELLED;
+            await transactionalEntityManager.save(booking);
+
+            // Cancel allocations (releases rooms)
+            if (booking.bookingRooms) {
+                for (const br of booking.bookingRooms) {
+                    if (br.allocation) {
+                        br.allocation.status = BookingRoomAllocationStatus.CANCELLED;
+                        await transactionalEntityManager.save(br.allocation);
+                    }
+                }
+            }
+
+            // Cancel service orders
+            if (booking.serviceOrders) {
+                for (const so of booking.serviceOrders) {
+                    if (so) {
+                        so.status = ServiceOrderStatus.CANCELLED;
+                        await transactionalEntityManager.save(so);
                     }
                 }
             }
 
             return {
-                message: `Cập nhật trạng thái phòng thành ${targetStatus} thành công`,
-                allocation_id: allocation.id,
-                room_status: allocation.status,
-                parent_booking_status: booking?.status
+                booking,
+                message,
+                refundAmount
             };
         });
-    },
+    }
 };
 
 export default bookingService;

@@ -49,7 +49,7 @@ export const AppDataSource = new DataSource({
         Review,
         BookingRoomAllocation,
         Payment,
-        BookingRoom,
+        BookingRoom,    
         ServiceOrder,
         ExtraService,
         Shift],

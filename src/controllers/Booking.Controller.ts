@@ -23,13 +23,24 @@ const bookingController = {
             const currentUserId = req["currentUser"]?.id;
 
             // Lấy các tham số từ URL query
-            const { status, user_id, hotel_id } = req.query;
+            const { status, user_id, hotel_id, booking_code } = req.query;
+
+            // Kiểm tra quyền: 
+            // - Nếu là USER: Chỉ xem được booking của chính mình
+            // - Nếu là STAFF/ADMIN: Xem được tất cả hoặc lọc theo user_id được truyền lên
+            const currentUserRole = req["currentUser"]?.role;
+            let targetUserId = user_id ? (user_id as string) : undefined;
+
+            if (currentUserRole === "user") {
+                targetUserId = currentUserId;
+            }
 
             // Đóng gói thành object filter
             const filters: BookingFilter = {
                 status: status as string,
-                user_id: currentUserId || (user_id ? Number(user_id) : undefined),
+                user_id: targetUserId as any,
                 hotel_id: hotel_id ? Number(hotel_id) : undefined,
+                booking_code: booking_code as string,
             };
 
             const bookings = await bookingService.getAll(filters);
@@ -92,6 +103,20 @@ const bookingController = {
             res.status(200).json(result);
         } catch (error: any) {
             res.status(400).json({ error: error.message });
+        }
+    },
+    cancel: async (req: Request, res: Response) => {
+        try {
+            const id = parseInt(req.params.id as string);
+            const currentUser = req["currentUser"];
+            
+            const result = await bookingService.cancel(id, currentUser);
+            res.status(200).json(result);
+        } catch (error: any) {
+            console.error("Error cancelling booking:", error);
+            const statusCode = error.message.includes("permission") ? 403 : 
+                             error.message.includes("not found") ? 404 : 400;
+            res.status(statusCode).json({ message: error.message || "Error cancelling booking" });
         }
     }
 

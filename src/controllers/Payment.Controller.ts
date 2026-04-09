@@ -14,12 +14,63 @@ const paymentController = {
                 return res.status(404).json({ message: "Booking not found" });
             }
 
-            const paymentLink = await payosService.createPaymentLink(booking);
-            res.status(200).json({
-                message: "Payment link created successfully",
-                data: paymentLink
-            });
-        } catch (error) {
+            // 1. Check existing order on PayOS if order_code exists
+            if (booking.order_code) {
+                try {
+                    const paymentDetail = await payosService.getPaymentDetail(Number(booking.order_code));
+                    const status = paymentDetail.status;
+                    console.log(`[PayOS Debug] Booking ${booking.id}, Status: ${status}, Keys: ${Object.keys(paymentDetail)}`);
+
+                    // If still pending, return the existing checkoutUrl if available
+                    if (status === "PENDING" && (paymentDetail as any).checkoutUrl) {
+                        console.log(`Reusing existing PENDING link for booking ${booking.id}. URL: ${(paymentDetail as any).checkoutUrl}`);
+                        return res.status(200).json({
+                            message: "Payment link already exists",
+                            data: paymentDetail
+                        });
+                    }
+
+                    // If already paid, confirm and return error
+                    if (status === "PAID") {
+                        await bookingService.confirmPayment(booking.id, paymentDetail.id);
+                        return res.status(400).json({ message: "Đơn hàng đã được thanh toán trước đó." });
+                    }
+
+                    // If EXPIRED, CANCELLED, or PENDING but missing checkoutUrl:
+                    // We must generate a new order_code to create a fresh link
+                    console.log(`Generating fresh link for booking ${booking.id} (Status: ${status}, No existing URL)`);
+                    const newOrderCode = Number(String(Date.now()));
+                    await bookingService.update(booking.id, { order_code: newOrderCode });
+                    booking.order_code = newOrderCode;
+                } catch (err: any) {
+                    // If not found on PayOS, we can proceed to create
+                    console.log(`Order ${booking.order_code} not found on PayOS or error: ${err.message}`);
+                }
+            }
+
+            // 2. Create or Re-create (if new/expired/cancelled)
+            try {
+                const paymentLink = await payosService.createPaymentLink(booking);
+                return res.status(200).json({
+                    message: "Payment link created successfully",
+                    data: paymentLink
+                });
+            } catch (payosError: any) {
+                // Final fallback if creation still fails with "exists" (race condition or stale code)
+                if (payosError.message && (payosError.message.includes("tồn tại") || payosError.message.includes("231"))) {
+                    const newOrderCode = Number(String(Date.now()));
+                    await bookingService.update(booking.id, { order_code: newOrderCode });
+                    booking.order_code = newOrderCode;
+
+                    const finalAttempt = await payosService.createPaymentLink(booking);
+                    return res.status(200).json({
+                        message: "Payment link created after conflict",
+                        data: finalAttempt
+                    });
+                }
+                throw payosError;
+            }
+        } catch (error: any) {
             console.error("Error creating PayOS link:", error);
             res.status(500).json({ message: error.message || "Error creating payment link" });
         }

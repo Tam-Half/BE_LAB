@@ -1,17 +1,26 @@
 {
-   "compilerOptions": {
-      "lib": [
-         "es2021",
-         "dom"
-      ],
-      "target": "es2021",
-      "module": "commonjs",
-      "moduleResolution": "node",
-      "outDir": "./build",
-      "emitDecoratorMetadata": true,
-      "experimentalDecorators": true,
-      "sourceMap": true,
-      "esModuleInterop": true,
-      "skipLibCheck": true
-   }
+  "compilerOptions": {
+    "target": "es2021",
+    "module": "node16",           // <-- Đã cập nhật để đồng bộ với moduleResolution
+    "moduleResolution": "node16", // <-- Giữ nguyên chuẩn mới
+    "lib": [
+      "es2021",                   // <-- Bổ sung thư viện chuẩn của ES2021
+      "dom"
+    ],
+    "outDir": "./build",
+    "rootDir": "./src",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true // (Khuyên dùng) Tránh lỗi viết hoa/thường trên các hệ điều hành khác nhau
+  },
+  "include": [
+    "src/**/*"                    // Đảm bảo TS chỉ biên dịch các file trong thư mục src
+  ],
+  "exclude": [
+    "node_modules",               // Bỏ qua thư viện
+    "build"                       // Bỏ qua thư mục đã build
+  ]
 }

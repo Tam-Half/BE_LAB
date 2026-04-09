@@ -7,6 +7,7 @@ import {
     CreateDateColumn
 } from "typeorm";
 import { Booking } from "./Booking";
+import { PaymentStatus } from "./Enums";
 
 @Entity({ name: "payments" })
 export class Payment {
@@ -26,8 +27,12 @@ export class Payment {
     @Column({ nullable: true })
     transaction_id: string;
 
-    @Column({ nullable: true, default: "pending" })
-    status: string;
+    @Column({
+        type: "enum",
+        enum: PaymentStatus,
+        default: PaymentStatus.PENDING
+    })
+    status: PaymentStatus;
 
     @Column({ type: "timestamp", nullable: true })
     payment_time: Date;

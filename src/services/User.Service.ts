@@ -1,6 +1,7 @@
 import { AppDataSource } from "../data-source";
 import { Account } from "../dto/Account";
 import { User } from "../dto/User";
+import { UserRole } from "../dto/Enums";
 import { encrypt } from "../helpers/helpers";
 
 const accountRepository = AppDataSource.getRepository(Account);
@@ -24,7 +25,7 @@ const userService = {
             username: payload.username,
             email: payload.email,
             password: hasedPassword,
-            role: payload.role,
+            role: payload.role || UserRole.USER,
             is_active: true,
         });
         const newAccount = await accountRepository.save(account);

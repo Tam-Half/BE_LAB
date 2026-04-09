@@ -2,6 +2,7 @@ import { AppDataSource } from "../data-source";
 import { RoomType } from "../dto/RoomType";
 import { Room } from "../dto/Room";
 import { BookingRoomAllocation } from "../dto/BookingRoomAllocation";
+import { BookingStatus } from "../dto/Enums";
 
 const roomTypeRepository = AppDataSource.getRepository(RoomType);
 const roomRepository = AppDataSource.getRepository(Room);
@@ -114,7 +115,7 @@ const AvailabilityService = {
             .innerJoin("allocation.bookingRoom", "bookingRoom")
             .innerJoin("bookingRoom.booking", "booking")
             .where("room.room_type_id = :roomTypeId", { roomTypeId })
-            .andWhere("booking.status != 'CANCELLED'")
+            .andWhere("booking.status != :cancelled", { cancelled: BookingStatus.CANCELLED })
             .andWhere("allocation.check_in_date < :checkOut AND allocation.check_out_date > :checkIn", {
                 checkIn,
                 checkOut
@@ -154,11 +155,12 @@ const AvailabilityService = {
                     .from(BookingRoomAllocation, "allocation")
                     .innerJoin("allocation.bookingRoom", "bookingRoom")
                     .innerJoin("bookingRoom.booking", "booking")
-                    .where("booking.status != 'CANCELLED'")
+                    .where("booking.status != :cancelled", { cancelled: BookingStatus.CANCELLED })
                     .andWhere("allocation.check_in_date < :checkOutDate AND allocation.check_out_date > :checkInDate")
                     .getQuery();
                 return "room.id NOT IN (" + subQuery + ")";
             })
+            .setParameter("cancelled", BookingStatus.CANCELLED)
             .setParameter("checkInDate", checkInDate)
             .setParameter("checkOutDate", checkOutDate)
             .limit(limit)
