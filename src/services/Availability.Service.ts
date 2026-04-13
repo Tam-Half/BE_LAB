@@ -59,6 +59,8 @@ const AvailabilityService = {
                 roomTypeId: roomType.id,
                 roomTypeName: roomType.name,
                 availableCount: availability.availableCount,
+                average_rating: roomType.average_rating,
+                review_count: roomType.review_count,
                 ...priceInfo,
             });
 
@@ -93,6 +95,8 @@ const AvailabilityService = {
                     busyCount: availability.busyCount,
                     availableCount: availability.availableCount,
                     capacity: roomType.capacity_people,
+                    average_rating: roomType.average_rating,
+                    review_count: roomType.review_count,
                     priceQuote: priceInfo,
                     images: roomType.images
                 });

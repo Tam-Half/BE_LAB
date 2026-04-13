@@ -56,7 +56,7 @@ const roomTypeService = {
     getAll: async () => {
         try {
             return await roomTypeRepository.find({
-                relations: ["images"]
+                relations: ["images", "reviews", "reviews.user"]
             });
         } catch (error) {
             throw error;

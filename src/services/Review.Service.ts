@@ -34,9 +34,9 @@ const reviewService = {
             throw new Error("You can only review your own bookings");
         }
 
-        // if ((booking.status !== BookingStatus.COMPLETED)) {
-        //     throw new Error("You can only review a completed booking");
-        // }
+        if ((booking.status !== BookingStatus.COMPLETED)) {
+            throw new Error("You can only review a completed booking");
+        }
 
         const roomType = await roomTypeRepository.findOneBy({ id: room_type_id });
         if (!roomType) throw new Error("Room type not found");
