@@ -60,6 +60,8 @@ const AvailabilityService = {
                 roomTypeName: roomType.name,
                 availableCount: availability.availableCount,
                 average_rating: roomType.average_rating,
+                size_m2: roomType.size_m2,
+                capacity_people: roomType.capacity_people,
                 review_count: roomType.review_count,
                 roomClass: roomType.roomClass,
                 ...priceInfo,
@@ -100,7 +102,10 @@ const AvailabilityService = {
                     review_count: roomType.review_count,
                     roomClass: roomType.roomClass,
                     priceQuote: priceInfo,
-                    images: roomType.images
+                    images: roomType.images,
+                    size_m2: roomType.size_m2,
+                    capacity_people: roomType.capacity_people,
+
                 });
             }
         }
