@@ -8,6 +8,7 @@ import { Floor } from "./dto/Floor"
 import { RoomType } from "./dto/RoomType"
 import { RoomTypeImage } from "./dto/RoomTypeImage"
 import { Room } from "./dto/Room"
+import { RoomClass } from "./dto/RoomClass"
 
 import { Amenities } from "./dto/Amenities"
 import { RoomTypeAmenities } from "./dto/RoomTypeAmenities"
@@ -40,6 +41,7 @@ export const AppDataSource = new DataSource({
         Floor,
         Room,
         RoomType,
+        RoomClass,
         RoomTypeImage,
         Amenities,
         RoomTypeAmenities,

@@ -16,6 +16,8 @@ import availabilityRouter from "./routes/Availability.Route"
 import extraServiceRouter from "./routes/ExtraService.Route"
 import shiftRouter from "./routes/Shift.Route"; 
 import chatRouter from "./routes/Chat.Route"
+import { RoomClass } from "./dto/RoomClass"
+import roomClassRouter from "./routes/RoomClass.Route"
 import reviewRouter from "./routes/Review.Route"
 import { authentification } from "./middleware/auth.middleware"
 
@@ -42,6 +44,7 @@ AppDataSource.initialize().then(async () => {
     app.use("/api/extra-service", extraServiceRouter)
     app.use("/api/shifts", shiftRouter);
     app.use("/api/chat", chatRouter)
+    app.use("/api/room-classes", roomClassRouter)
     app.use("/api/reviews", reviewRouter)
 
     initCron()
