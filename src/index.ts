@@ -14,7 +14,7 @@ import bookingRouter from "./routes/Booking.Route"
 import paymentRouter from "./routes/Payment.Route"
 import availabilityRouter from "./routes/Availability.Route"
 import extraServiceRouter from "./routes/ExtraService.Route"
-import shiftRouter from "./routes/Shift.Route"; 
+import shiftRouter from "./routes/Shift.Route";
 import chatRouter from "./routes/Chat.Route"
 import { RoomClass } from "./dto/RoomClass"
 import roomClassRouter from "./routes/RoomClass.Route"
@@ -31,7 +31,7 @@ app.use(cors())
 app.use(loggingMiddleware)
 
 AppDataSource.initialize().then(async () => {
-
+    app.use(cors({ origin: '*' }));
     app.use("/api/auth", authRouter)
     app.use("/api/user", userRouter)
     app.use("/api/floor", floorRouter)
