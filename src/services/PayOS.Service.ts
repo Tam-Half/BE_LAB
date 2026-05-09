@@ -24,7 +24,7 @@ const payosService = {
             })),
             returnUrl: `${domain}/payment/success?booking_id=${booking.id}`,
             cancelUrl: `${domain}/payment/cancel?booking_id=${booking.id}`,
-            expiredAt: Math.floor(booking.expires_at.getTime() / 1000)
+            expiredAt: Math.floor(Date.now() / 1000) + 30 * 60 // 30 minutes from now
         };
 
         return await payos.paymentRequests.create(body);
