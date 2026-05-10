@@ -1,8 +1,9 @@
+import { Request, Response } from "express";
 import roomTypeService from "../services/RoomType.Service";
 import { uploadToCloudinary } from "../middleware/upload";
 
 const roomTypeController = {
-    create: async (req, res) => {
+    create: async (req: Request, res: Response) => {
         try {
             const payload = req.body;
             const files = req.files as Express.Multer.File[];
@@ -24,7 +25,7 @@ const roomTypeController = {
             res.status(500).json({ message: "Lỗi khi tạo loại phòng", error: error.message });
         }
     },
-    update: async (req, res) => {
+    update: async (req: Request, res: Response) => {
         try {
             const id = parseInt(req.params.id);
             const payload = req.body;
@@ -35,7 +36,7 @@ const roomTypeController = {
             res.status(500).json({ message: error.message });
         }
     },
-    delete: async (req, res) => {
+    delete: async (req: Request, res: Response) => {
         try {
             const id = parseInt(req.params.id);
             await roomTypeService.delete(id);
@@ -45,7 +46,7 @@ const roomTypeController = {
             res.status(500).json({ message: "Lỗi khi xóa loại phòng", error: error.message });
         }
     },
-    getAll: async (req, res) => {
+    getAll: async (req: Request, res: Response) => {
         try {
             const roomTypes = await roomTypeService.getAll();
             res.status(200).json({ data: roomTypes });
@@ -54,7 +55,7 @@ const roomTypeController = {
             res.status(500).json({ message: "Lỗi khi lấy danh sách loại phòng", error: error.message });
         }
     },
-    getById: async (req, res) => {
+    getById: async (req: Request, res: Response) => {
         try {
             const id = parseInt(req.params.id as string);
             const { checkIn, checkOut } = req.query as any;
