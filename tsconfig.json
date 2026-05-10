@@ -14,7 +14,8 @@
     "sourceMap": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true // (Khuyên dùng) Tránh lỗi viết hoa/thường trên các hệ điều hành khác nhau
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node", "express", "multer"]
   },
   "include": [
     "src/**/*"                    // Đảm bảo TS chỉ biên dịch các file trong thư mục src

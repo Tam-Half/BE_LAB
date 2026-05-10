@@ -1,4 +1,6 @@
+/// <reference types="multer" />
 import { Request, Response } from "express";
+import 'multer';
 import roomTypeService from "../services/RoomType.Service";
 import { uploadToCloudinary } from "../middleware/upload";
 
@@ -27,7 +29,7 @@ const roomTypeController = {
     },
     update: async (req: Request, res: Response) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseInt(req.params.id as string);
             const payload = req.body;
             await roomTypeService.update(id, payload);
             res.status(200).json({ message: "Cập nhật loại phòng thành công" });
@@ -38,7 +40,7 @@ const roomTypeController = {
     },
     delete: async (req: Request, res: Response) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseInt(req.params.id as string);
             await roomTypeService.delete(id);
             res.status(200).json({ message: "Xóa loại phòng thành công" });
         } catch (error) {
