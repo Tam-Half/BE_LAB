@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
     "target": "es2021",
-    "module": "node16",           // <-- Đã cập nhật để đồng bộ với moduleResolution
-    "moduleResolution": "node16", // <-- Giữ nguyên chuẩn mới
+    "module": "node16",
+    "moduleResolution": "node16",
     "lib": [
-      "es2021",                   // <-- Bổ sung thư viện chuẩn của ES2021
+      "es2021",
       "dom"
     ],
     "outDir": "./build",
@@ -18,10 +18,10 @@
     "types": ["node", "express", "multer"]
   },
   "include": [
-    "src/**/*"                    // Đảm bảo TS chỉ biên dịch các file trong thư mục src
+    "src/**/*"
   ],
   "exclude": [
-    "node_modules",               // Bỏ qua thư viện
-    "build"                       // Bỏ qua thư mục đã build
+    "node_modules",
+    "build"
   ]
 }
