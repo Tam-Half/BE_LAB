@@ -1,8 +1,11 @@
 import vault from "node-vault"
+import * as dotenv from "dotenv"
+
+dotenv.config()
 
 const vaultClient = vault({
   apiVersion: "v1",
-  endpoint: 'http://localhost:8210'
+  endpoint:  process.env.VAULT_ADDR
 })
 
 export async function getDatabaseCredentials() {
