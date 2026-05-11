@@ -25,7 +25,7 @@ const authService = {
             }
             const access_token = encrypt.generateAccessToken({ id: user.id, role: account.role as UserRole });
             const refresh_token = encrypt.generateRefreshToken({ id: user.id, role: account.role as UserRole });
-            const  accountId = account.id;
+            const accountId = account.id;
             console.log("Account ID:", accountId);
             return { access_token, refresh_token, accountId };
         } catch (error) {
