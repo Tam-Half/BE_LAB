@@ -27,16 +27,28 @@ import { getDatabaseCredentials } from "./vault"
 
 dotenv.config()
 
+const isProduction = process.env.NODE_ENV === "production"
+
 export const AppDataSource = new DataSource({
     type: "postgres",
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT),
 
-    // temporary value (sẽ bị override)
-    username: "temp",
-    password: "temp",
+    ...(isProduction
+        ? {
+              url: process.env.DB_URL,
+              ssl: {
+                  rejectUnauthorized: false
+              }
+          }
+        : {
+              host: process.env.DB_HOST,
+              port: Number(process.env.DB_PORT),
 
-    database: process.env.DB_NAME,
+              // temporary value (sẽ bị override bởi Vault)
+              username: "temp",
+              password: "temp",
+
+              database: process.env.DB_NAME
+          }),
 
     synchronize: true,
     logging: false,
@@ -72,7 +84,9 @@ export async function initDataSource() {
 
     const creds = await getDatabaseCredentials()
 
-    // inject credentials từ Vault
+    console.log("Vault username:", creds.username)
+    console.log("Vault TTL:", creds.ttl, "seconds")
+
     AppDataSource.setOptions({
         username: creds.username,
         password: creds.password
@@ -80,5 +94,17 @@ export async function initDataSource() {
 
     await AppDataSource.initialize()
 
-    console.log("Database connected with Vault dynamic credentials")
+    console.log("Database connected using Vault dynamic credentials")
+
+    // dùng TTL từ Vault
+    setTimeout(async () => {
+
+        console.log("Vault lease expired → closing DB connection")
+
+        if (AppDataSource.isInitialized) {
+            await AppDataSource.destroy()
+            console.log("Database connection closed")
+        }
+
+    }, creds.ttl * 1000)
 }

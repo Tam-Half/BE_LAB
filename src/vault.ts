@@ -22,10 +22,12 @@ export async function getDatabaseCredentials() {
 
 
   // get dynamic credential
-  const creds = await vaultClient.read("database/creds/pgadmin-role")
+  const creds = await vaultClient.read("database/creds/pgadmin-role-production")
+  // const creds = await vaultClient.read("database/creds/pgadmin-role")
 
   return {
     username: creds.data.username,
-    password: creds.data.password
+    password: creds.data.password,
+    ttl: creds.lease_duration
   }
 }
