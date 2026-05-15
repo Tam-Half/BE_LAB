@@ -9,7 +9,7 @@ const payos = new PayOS({
     checksumKey: process.env.PAYOS_CHECKSUM_KEY || ""
 });
 
-const domain = window.__ENV__?.API_URL || "http://localhost:5173";
+const domain = process.env.API_URL || "http://localhost:5173";
 
 const payosService = {
     createPaymentLink: async (booking: any) => {
