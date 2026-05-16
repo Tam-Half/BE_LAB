@@ -17,7 +17,7 @@ import shiftRouter from "./routes/Shift.Route"
 import chatRouter from "./routes/Chat.Route"
 import roomClassRouter from "./routes/RoomClass.Route"
 import reviewRouter from "./routes/Review.Route"
-
+import reportRouter from "./routes/Report.Route"
 import { authentification } from "./middleware/auth.middleware"
 import { initCron } from "./helpers/cron"
 import { loggingMiddleware } from "./middleware/loggin.middleware"
@@ -30,32 +30,32 @@ app.use(cors())
 app.use(loggingMiddleware)
 
 initDataSource()
-.then(async () => {
+    .then(async () => {
 
-    app.use(cors({ origin: '*' }))
+        app.use(cors({ origin: '*' }))
 
-    app.use("/api/auth", authRouter)
-    app.use("/api/user", userRouter)
-    app.use("/api/floor", floorRouter)
-    app.use("/api/hotel", hotelRouter)
-    app.use("/api/room", roomRouter)
-    app.use("/api/room-type", roomTypeRouter)
-    app.use("/api/bookings", bookingRouter)
-    app.use("/api/payments", paymentRouter)
-    app.use("/api/availability", availabilityRouter)
-    app.use("/api/extra-service", extraServiceRouter)
-    app.use("/api/shifts", shiftRouter)
-    app.use("/api/chat", chatRouter)
-    app.use("/api/room-classes", roomClassRouter)
-    app.use("/api/reviews", reviewRouter)
+        app.use("/api/auth", authRouter)
+        app.use("/api/user", userRouter)
+        app.use("/api/floor", floorRouter)
+        app.use("/api/hotel", hotelRouter)
+        app.use("/api/room", roomRouter)
+        app.use("/api/room-type", roomTypeRouter)
+        app.use("/api/bookings", bookingRouter)
+        app.use("/api/payments", paymentRouter)
+        app.use("/api/availability", availabilityRouter)
+        app.use("/api/extra-service", extraServiceRouter)
+        app.use("/api/shifts", shiftRouter)
+        app.use("/api/chat", chatRouter)
+        app.use("/api/room-classes", roomClassRouter)
+        app.use("/api/reviews", reviewRouter)
+        app.use("/api/reports", reportRouter)
+        initCron()
 
-    initCron()
+        app.listen(port, () => {
+            console.log(`Server is running on ${port}`)
+        })
 
-    app.listen(port, () => {
-        console.log(`Server is running on ${port}`)
     })
-
-})
-.catch(error => {
-    console.error("Database initialization failed:", error)
-})
+    .catch(error => {
+        console.error("Database initialization failed:", error)
+    })
