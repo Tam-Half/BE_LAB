@@ -118,6 +118,17 @@ const bookingController = {
                              error.message.includes("not found") ? 404 : 400;
             res.status(statusCode).json({ message: error.message || "Error cancelling booking" });
         }
+    },
+
+    checkout: async (req: Request, res: Response) => {
+        try {
+            const id = parseInt(req.params.id as string);
+            const result = await bookingService.checkout(id, req.body);
+            res.status(200).json({ message: "Checkout completed successfully", data: result });
+        } catch (error) {
+            console.error("Error during checkout:", error);
+            res.status(500).json({ message: error.message || "Error during checkout" });
+        }
     }
 
 };

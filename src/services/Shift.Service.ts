@@ -14,19 +14,32 @@ const accountRepository = AppDataSource.getRepository(Account);
 const bookingRepository = AppDataSource.getRepository(Booking);
 
 const shiftService = {
-    // 1. Mở ca làm việc
+
+    getAllShifts: async () => {
+        try {
+            const shifts = await shiftRepository.find({
+                relations: ["staff"],
+                order: {
+                    start_time: "DESC"
+                }
+            });
+            return shifts.map((shift: any) => {
+                const staffName = shift.staff ? (shift.staff.name || shift.staff.username || shift.staff.fullname) : null;
+
+                const { staff, ...shiftData } = shift;
+
+                return {
+                    ...shiftData,
+                    staff_name: staffName
+                };
+            });
+        } catch (error) {
+            throw error;
+        }
+    },
     startShift: async (payload: { staffId: string; initialCash: number }) => {
         try {
             const { staffId, initialCash } = payload;
-
-            const existingShift = await shiftRepository.findOne({
-                where: { staff: { id: staffId }, status: "open" }
-            });
-
-            if (existingShift) {
-                throw new Error("Bạn đang có một ca làm việc chưa kết thúc!");
-            }
-
             const staff = await accountRepository.findOneBy({ id: staffId });
             if (!staff) throw new Error("Nhân viên không tồn tại");
 
@@ -36,130 +49,91 @@ const shiftService = {
             newShift.start_time = new Date();
             newShift.status = "open";
 
-            // Lưu vào DB
             const savedShift = await shiftRepository.save(newShift);
-
-            // [FIX] Trả về dữ liệu đã lọc bỏ password
-            return {
-                ...savedShift,
-                staff: {
-                    id: staff.id,
-                    username: staff.username,
-                    email: staff.email
-                    // Chỉ lấy những trường bạn muốn hiển thị
-                }
-            };
-
+            return savedShift;
         } catch (error) {
             throw error;
         }
     },
 
-    // [MỚI] 1b. Lấy thông tin ca hiện tại của nhân viên (Ca đang Open)
     getCurrentShiftByStaff: async (staffId: string) => {
         try {
-            const shift = await shiftRepository.findOne({
-                where: { 
-                    staff: { id: staffId }, 
-                    status: "open" // Quan trọng: Chỉ lấy ca đang mở
-                },
-                relations: ["staff"],
-                select: {
-                    // Chọn trường bảng Shift
-                    id: true,
-                    initial_cash: true,
-                    start_time: true,
-                    status: true,
-                    // Chọn trường bảng Staff (loại bỏ password)
-                    staff: {
-                        id: true,
-                        username: true,
-                        email: true
-                    }
-                }
+            return await shiftRepository.findOne({
+                where: { staff: { id: staffId }, status: "open" },
+                relations: ["staff"]
             });
-
-            // Nếu không có ca nào đang mở, trả về null (để frontend biết mà hiện nút Mở Ca)
-            return shift; 
         } catch (error) {
             throw error;
         }
     },
 
-    // 2. Lấy báo cáo thống kê
-   getShiftReport: async (shiftId: number) => {
+    getShiftReport: async (shiftId: number) => {
         try {
             const shift = await shiftRepository.findOne({
                 where: { id: shiftId },
-                relations: ["staff"],
-                select: {
-                    id: true,
-                    initial_cash: true,
-                    start_time: true,
-                    end_time: true,
-                    status: true,
-                    system_revenue: true,
-                    actual_cash_handover: true,
-                    note: true,
-                    created_at: true,
-                    updated_at: true,
-                    staff: {
-                        id: true,
-                        username: true,
-                        email: true
-                    }
-                }
+                relations: ["staff"]
             });
 
             if (!shift) throw new Error("Không tìm thấy ca làm việc");
 
-            const startTime = shift.start_time;
-            const endTime = shift.end_time ? shift.end_time : new Date();
+            const sTime = new Date(shift.start_time);
+            const eTime = shift.end_time ? new Date(shift.end_time) : new Date();
 
-            // A. Doanh thu Payment
-            // [SỬA LỖI] Thay vì dùng chuỗi "completed", hãy dùng Enum PaymentStatus.PAID
-            const payments = await paymentRepository.find({
-                where: { 
-                    created_at: Between(startTime, endTime), 
-                    status: PaymentStatus.PAID // <-- Sửa tại đây
+            // --- BÙ TRỪ MÚI GIỜ ---
+            // Lấy độ lệch múi giờ của server (VD: Việt Nam là -420 phút, tức -7 giờ)
+            const timezoneOffsetMs = new Date().getTimezoneOffset() * 60 * 1000;
+            const sTimeDB = new Date(sTime.getTime() + timezoneOffsetMs);
+            const eTimeDB = new Date(eTime.getTime() + timezoneOffsetMs);
+
+
+            // 1. Lấy thông tin Bookings trong ca
+            const bookingsInShift = await bookingRepository.createQueryBuilder("b")
+                .leftJoinAndSelect("b.user", "u")
+                .where("b.created_at >= :start", { start: sTimeDB })
+                .andWhere("b.created_at <= :end", { end: eTimeDB })
+                .getMany();
+
+            // 2. Lấy thông tin Payments trong ca (CHỈ LẤY GIAO DỊCH THÀNH CÔNG)
+            const paymentsInShift = await paymentRepository.createQueryBuilder("p")
+                .where("p.created_at >= :start", { start: sTimeDB })
+                .andWhere("p.created_at <= :end", { end: eTimeDB })
+                .andWhere("p.status = :status", { status: PaymentStatus.PAID })
+                .getMany();
+
+            let cashCollected = 0;
+            let bankCollected = 0;
+
+            paymentsInShift.forEach(payment => {
+                const method = (payment.payment_method || "").trim().toUpperCase();
+                if (method === "CASH" || method === "TIỀN MẶT" || method === "TIEN MAT") {
+                    cashCollected += Number(payment.amount);
+                } else {
+                    bankCollected += Number(payment.amount);
                 }
             });
 
-            const cashRevenue = payments
-                .filter(p => p.payment_method === "CASH")
-                .reduce((sum, p) => sum + Number(p.amount), 0);
-
-            const bankRevenue = payments
-                .filter(p => ["BANKING", "CARD", "CREDIT"].includes(p.payment_method))
-                .reduce((sum, p) => sum + Number(p.amount), 0);
-
-            // B. Booking & Service Order
-            const bookings = await bookingRepository.find({
-                where: { created_at: Between(startTime, endTime) },
-                relations: ["user"]
-            });
-
-            // Lưu ý: Đảm bảo các relation name này khớp chính xác với entity của bạn
-            const serviceOrders = await serviceOrderRepository.find({
-                where: { created_at: Between(startTime, endTime) },
-                relations: ["booking", "booking.bookingRooms", "booking.bookingRooms.allocation.room"]
-            });
+            // 4. Lấy Service Orders trong ca
+            const serviceOrdersInShift = await serviceOrderRepository.createQueryBuilder("so")
+                .where("so.created_at >= :start", { start: sTimeDB })
+                .andWhere("so.created_at <= :end", { end: eTimeDB })
+                .getMany();
 
             return {
                 shift_info: shift,
                 revenue: {
                     start_cash: Number(shift.initial_cash),
-                    cash_collected: cashRevenue,
-                    bank_collected: bankRevenue,
-                    total_system_revenue: cashRevenue + bankRevenue,
-                    expected_cash_in_drawer: Number(shift.initial_cash) + cashRevenue
+                    cash_collected: cashCollected,
+                    bank_collected: bankCollected,
+                    total_system_revenue: cashCollected + bankCollected,
+                    expected_cash_in_drawer: Number(shift.initial_cash) + cashCollected
                 },
                 activities: {
-                    total_payments: payments.length,
-                    total_bookings: bookings.length,
-                    total_service_orders: serviceOrders.length,
-                    booking_list: bookings,
-                    service_order_list: serviceOrders
+                    total_payments: paymentsInShift.length,
+                    total_bookings: bookingsInShift.length,
+                    total_service_orders: serviceOrdersInShift.length,
+                    booking_list: bookingsInShift,
+                    payment_list: paymentsInShift,
+                    service_order_list: serviceOrdersInShift
                 }
             };
         } catch (error) {
@@ -167,30 +141,21 @@ const shiftService = {
         }
     },
 
-    // 3. Chốt ca
     endShift: async (payload: { shiftId: number; actualCash: number; note: string }) => {
         try {
             const { shiftId, actualCash, note } = payload;
-            
-            // Gọi hàm getShiftReport (lúc này shift_info bên trong đã sạch password nhờ đoạn select ở trên)
-            const report = await shiftService.getShiftReport(shiftId);
-            const shift = report.shift_info;
-
-            if (shift.status === "closed") throw new Error("Ca này đã đóng rồi!");
+            const shift = await shiftRepository.findOneBy({ id: shiftId });
+            if (!shift) throw new Error("Không tìm thấy ca");
 
             shift.end_time = new Date();
             shift.status = "closed";
-            shift.system_revenue = report.revenue.total_system_revenue;
             shift.actual_cash_handover = actualCash;
             shift.note = note;
-
-            await shiftRepository.save(shift);
-
-            return shift;
+            return await shiftRepository.save(shift);
         } catch (error) {
             throw error;
         }
     }
-}
+};
 
 export default shiftService;

@@ -5,8 +5,6 @@ import { reportService, DashboardType } from "../services/Report.Service";
 //
 // Query params:
 //   type       : "today" | "week" | "month" | "quarter" | "custom"  (mặc định: "month")
-//   startDate  : ISO string – bắt buộc khi type=custom
-//   endDate    : ISO string – bắt buộc khi type=custom
 //   hotelId    : number     – tuỳ chọn, lọc theo khách sạn cụ thể
 //
 export async function getDashboardData(req: Request, res: Response) {

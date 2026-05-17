@@ -134,7 +134,8 @@ export class ReportService {
                 break;
             }
             case "custom":
-                if (!startDate || !endDate) throw new Error("startDate và endDate là bắt buộc khi type=custom");
+                console.log("startDate", startDate);
+                console.log("endDate", endDate);
                 rangeStart = startOfDay(startDate);
                 rangeEnd = endOfDay(endDate);
                 break;
@@ -259,7 +260,6 @@ export class ReportService {
         };
     }
 
-    // ── Private helpers ────────────────────────────────────────────────────
 
     private async getMonthSummary(year: number, month: number, hotelId?: number) {
         const start = new Date(year, month - 1, 1);
@@ -291,14 +291,7 @@ export class ReportService {
         };
     }
 
-    /**
-     * Nhóm bookings thành các điểm dữ liệu cho biểu đồ.
-     * today    → theo giờ (00-23)
-     * week     → theo ngày trong tuần (Mon-Sun)
-     * month    → theo ngày trong tháng (1-31)
-     * quarter  → theo tuần (W1-W13)
-     * custom   → theo ngày nếu ≤31 ngày, theo tuần nếu ≤90, theo tháng nếu lớn hơn
-     */
+
     private buildChartData(
         bookings: Booking[],
         type: DashboardType,

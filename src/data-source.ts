@@ -34,21 +34,21 @@ export const AppDataSource = new DataSource({
 
     ...(isProduction
         ? {
-              url: process.env.DB_URL,
-              ssl: {
-                  rejectUnauthorized: false
-              }
-          }
+            url: process.env.DB_URL,
+            ssl: {
+                rejectUnauthorized: false
+            }
+        }
         : {
-              host: process.env.DB_HOST,
-              port: Number(process.env.DB_PORT),
+            host: process.env.DB_HOST,
+            port: Number(process.env.DB_PORT),
 
-              // temporary value (sẽ bị override bởi Vault)
-              username: "temp",
-              password: "temp",
+            // temporary value (sẽ bị override bởi Vault)
+            username: "temp",
+            password: "temp",
 
-              database: process.env.DB_NAME
-          }),
+            database: process.env.DB_NAME
+        }),
 
     synchronize: true,
     logging: false,
