@@ -10,14 +10,15 @@ export enum BookingStatus {
 export enum BookingRoomAllocationStatus {
     NOT_CHECKED_IN = "NOT_CHECKED_IN",
     CHECKED_IN = "CHECKED_IN",
-    CHECKED_OUT = "CHECKED_OUT", 
+    CHECKED_OUT = "CHECKED_OUT",
     CANCELLED = "CANCELLED"
 }
 
 export enum ServiceOrderStatus {
     PENDING = "pending",
     FULFILLED = "fulfilled",
-    CANCELLED = "cancelled"
+    CANCELLED = "cancelled",
+    COMPLETED = "completed"
 }
 
 export enum PaymentStatus {

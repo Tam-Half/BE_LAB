@@ -34,14 +34,14 @@ export const AppDataSource = new DataSource({
         ? {
             url: process.env.DB_URL,
             ssl: { rejectUnauthorized: false },
-          }
+        }
         : {
             host: process.env.DB_HOST,
             port: 5432,
             username: process.env.DB_USER,
             password: process.env.DB_PASSWORD,
             database: process.env.DB_NAME,
-          }),
+        }),
     synchronize: true,
     logging: false,
     entities: [User,
@@ -60,7 +60,7 @@ export const AppDataSource = new DataSource({
         Review,
         BookingRoomAllocation,
         Payment,
-        BookingRoom,    
+        BookingRoom,
         ServiceOrder,
         ExtraService,
         Shift],
