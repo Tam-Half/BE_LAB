@@ -467,16 +467,18 @@ const bookingService = {
         });
     },
 
-    checkout: async (id: number, payload: { payment_method: string, amount_paid?: number, transaction_id?: string }) => {
+    checkout: async (id: number, payload: { payment_method: string, amount_paid?: number, transaction_id?: string, extra_services?: { service_id: number, quantity: number }[] }) => {
         return await AppDataSource.transaction(async (transactionalEntityManager) => {
             const bookingRepo = transactionalEntityManager.getRepository(Booking);
             const allocationRepo = transactionalEntityManager.getRepository(BookingRoomAllocation);
             const roomRepo = transactionalEntityManager.getRepository(Room);
             const paymentRepo = transactionalEntityManager.getRepository(Payment);
+            const extraSvcRepo = transactionalEntityManager.getRepository(ExtraService);
+            const serviceOrderRepo = transactionalEntityManager.getRepository(ServiceOrder);
 
             const booking = await bookingRepo.findOne({
                 where: { id },
-                relations: ["bookingRooms", "bookingRooms.allocation", "bookingRooms.allocation.room"]
+                relations: ["bookingRooms", "bookingRooms.allocation", "bookingRooms.allocation.room", "serviceOrders"]
             });
 
             if (!booking) throw new Error("Booking not found");
@@ -486,21 +488,50 @@ const bookingService = {
                 return { booking, message: "Booking already completed" };
             }
 
-            // 1. Update Booking Status
+            // 1. Handle Extra Services (Minibar, etc.)
+            if (payload.extra_services && payload.extra_services.length > 0) {
+                let additionalTotal = 0;
+                for (const svcReq of payload.extra_services) {
+                    const service = await extraSvcRepo.findOneBy({ id: svcReq.service_id });
+                    if (!service) continue;
+
+                    const unitPrice = Number(service.base_price) || 0;
+                    const quantity = svcReq.quantity || 1;
+                    const svcTotal = unitPrice * quantity;
+
+                    const serviceOrder = serviceOrderRepo.create({
+                        booking: booking,
+                        service: service,
+                        service_name_snapshot: service.name,
+                        quantity: quantity,
+                        unit_price: unitPrice,
+                        total_price: svcTotal,
+                        status: ServiceOrderStatus.COMPLETED // Already consumed at checkout
+                    });
+                    await serviceOrderRepo.save(serviceOrder);
+                    additionalTotal += svcTotal;
+                }
+
+                // Recalculate Booking Total Price
+                const currentTotal = Number(booking.total_price) || 0;
+                // Since total_price already includes VAT (8%), we need to add new services + their VAT
+                const additionalWithVat = additionalTotal * 1.08;
+                booking.total_price = currentTotal + additionalWithVat;
+            }
+
+            // 2. Update Booking Status
             booking.status = BookingStatus.COMPLETED;
             booking.payment_status = PaymentStatus.PAID;
             await bookingRepo.save(booking);
 
-            // 2. Update All Allocations and Rooms
+            // 3. Update All Allocations and Rooms
             if (booking.bookingRooms) {
                 for (const br of booking.bookingRooms) {
                     if (br.allocation) {
-                        // Set allocation to CHECKED_OUT
                         br.allocation.status = BookingRoomAllocationStatus.CHECKED_OUT;
                         br.allocation.check_out_date = new Date();
                         await allocationRepo.save(br.allocation);
 
-                        // Set room to DIRTY
                         if (br.allocation.room) {
                             br.allocation.room.status = RoomStatus.DIRTY;
                             await roomRepo.save(br.allocation.room);
@@ -509,8 +540,7 @@ const bookingService = {
                 }
             }
 
-            // 3. Create or Update Payment Record
-            // Check if payment already exists for this booking
+            // 4. Create or Update Payment Record
             let payment = await paymentRepo.findOneBy({ booking: { id: booking.id } });
             
             if (payment) {
