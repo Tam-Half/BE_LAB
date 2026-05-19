@@ -8,14 +8,16 @@ import { Booking } from "../dto/Booking";
 const paymentController = {
     createPayOSLink: async (req: Request, res: Response) => {
         try {
-            const { booking_id } = req.body;
+            const { booking_id, amount } = req.body;
             const booking = await bookingService.getById(booking_id);
             if (!booking) {
                 return res.status(404).json({ message: "Booking not found" });
             }
 
-            // 1. Check existing order on PayOS if order_code exists
-            if (booking.order_code) {
+            const isBookingPaid = booking.payment_status === 'paid';
+
+            // 1. Check existing order on PayOS if order_code exists (only if booking is NOT paid and no custom amount is requested)
+            if (booking.order_code && !isBookingPaid && amount === undefined) {
                 try {
                     const paymentDetail = await payosService.getPaymentDetail(Number(booking.order_code));
                     const status = paymentDetail.status;
@@ -48,9 +50,16 @@ const paymentController = {
                 }
             }
 
+            // If the booking was already paid or custom amount is requested, we MUST generate a fresh order_code
+            if (isBookingPaid || amount !== undefined) {
+                const newOrderCode = Number(String(Date.now()));
+                await bookingService.update(booking.id, { order_code: newOrderCode });
+                booking.order_code = newOrderCode;
+            }
+
             // 2. Create or Re-create (if new/expired/cancelled)
             try {
-                const paymentLink = await payosService.createPaymentLink(booking);
+                const paymentLink = await payosService.createPaymentLink(booking, amount);
                 return res.status(200).json({
                     message: "Payment link created successfully",
                     data: paymentLink
@@ -62,7 +71,7 @@ const paymentController = {
                     await bookingService.update(booking.id, { order_code: newOrderCode });
                     booking.order_code = newOrderCode;
 
-                    const finalAttempt = await payosService.createPaymentLink(booking);
+                    const finalAttempt = await payosService.createPaymentLink(booking, amount);
                     return res.status(200).json({
                         message: "Payment link created after conflict",
                         data: finalAttempt
