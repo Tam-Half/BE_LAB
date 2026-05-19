@@ -12,13 +12,17 @@ const payos = new PayOS({
 const domain = process.env.API_URL || "http://localhost:5173";
 
 const payosService = {
-    createPaymentLink: async (booking: any) => {
-
+    createPaymentLink: async (booking: any, customAmount?: number) => {
+        const domain = process.env.FRONTEND_URL || "http://localhost:5173";
+        const chargeAmount = customAmount !== undefined ? customAmount : Number(booking.total_price);
+        const description = customAmount !== undefined 
+            ? `DV DoraHotel ${booking.booking_code}`.slice(0, 25)
+            : `TT DoraHotel ${booking.booking_code}`.slice(0, 25);
 
         const body: any = {
             orderCode: Number(booking.order_code),
-            amount: Number(booking.total_price),
-            description: `TT DoraHotel ${booking.booking_code}`.slice(0, 25),
+            amount: chargeAmount,
+            description: description,
             items: booking.bookingDetails.map((detail: any) => ({
                 name: detail.roomType.name,
                 quantity: detail.quantity,
