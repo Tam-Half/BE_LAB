@@ -6,7 +6,8 @@ ENV NODE_ENV=production
 
 COPY package*.json ./
 
-RUN npm ci --omit=dev
+# Đổi từ npm ci sang npm install
+RUN npm install --omit=dev
 
 COPY . .
 
