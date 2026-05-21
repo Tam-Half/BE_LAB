@@ -15,9 +15,9 @@ export class encrypt {
     }
 
     static generateAccessToken(payload: { id: string; role: string }) {
-        return jwt.sign({ id: payload.id, role: payload.role }, JWT_SECRET, { expiresIn: "2h" });
+        return jwt.sign({ id: payload.id, role: payload.role }, JWT_SECRET, { expiresIn: "24h" });
     }
     static generateRefreshToken(payload: { id: string; role: string }) {
-        return jwt.sign({ id: payload.id, role: payload.role }, JWT_SECRET, { expiresIn: "1d" });
+        return jwt.sign({ id: payload.id, role: payload.role }, JWT_SECRET, { expiresIn: "7d" });
     }
 }
