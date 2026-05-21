@@ -109,13 +109,13 @@ const bookingController = {
         try {
             const id = parseInt(req.params.id as string);
             const currentUser = req["currentUser"];
-            
+
             const result = await bookingService.cancel(id, currentUser);
             res.status(200).json(result);
         } catch (error: any) {
             console.error("Error cancelling booking:", error);
-            const statusCode = error.message.includes("permission") ? 403 : 
-                             error.message.includes("not found") ? 404 : 400;
+            const statusCode = error.message.includes("permission") ? 403 :
+                error.message.includes("not found") ? 404 : 400;
             res.status(statusCode).json({ message: error.message || "Error cancelling booking" });
         }
     },
@@ -128,6 +128,23 @@ const bookingController = {
         } catch (error) {
             console.error("Error during checkout:", error);
             res.status(500).json({ message: error.message || "Error during checkout" });
+        }
+    },
+
+    changeRoom: async (req: Request, res: Response) => {
+        try {
+            const bookingId = parseInt(req.params.id as string);
+            const { allocationId, targetRoomId, recalculatePrice } = req.body;
+
+            if (!allocationId || !targetRoomId) {
+                return res.status(400).json({ error: "Thiếu allocationId hoặc targetRoomId" });
+            }
+
+            const result = await bookingService.changeRoom(bookingId, allocationId, targetRoomId, !!recalculatePrice);
+            res.status(200).json(result);
+        } catch (error: any) {
+            console.error("Error during changeRoom:", error);
+            res.status(400).json({ error: error.message || "Lỗi trong quá trình chuyển phòng" });
         }
     }
 

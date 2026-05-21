@@ -52,11 +52,13 @@ const roomController = {
         }
     },
 
-    // API: GET /api/rooms/grid-status?floor_id=2
+    // API: GET /api/rooms/grid-status?floor_id=2&check_in=...&check_out=...
     getRoomGrid: async ( req , res ) => {
         try {
             const floorId = req.query.floor_id ? Number(req.query.floor_id) : undefined;
-            const data = await roomService.getRoomGridStatus(floorId);
+            const checkIn = req.query.check_in ? String(req.query.check_in) : undefined;
+            const checkOut = req.query.check_out ? String(req.query.check_out) : undefined;
+            const data = await roomService.getRoomGridStatus(floorId, checkIn, checkOut);
             res.status(200).json(data);
         } catch (error: any) {
             res.status(500).json({ message: error.message });

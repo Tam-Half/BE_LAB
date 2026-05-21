@@ -117,8 +117,10 @@ const roomService = {
     },
 
 
-    getRoomGridStatus: async (floor_id?: number) => {
+    getRoomGridStatus: async (floor_id?: number, check_in?: string, check_out?: string) => {
         const now = new Date();
+        const startRange = check_in && !isNaN(Date.parse(check_in)) ? new Date(check_in) : null;
+        const endRange = check_out && !isNaN(Date.parse(check_out)) ? new Date(check_out) : null;
 
         const rooms = await roomRepository.find({
             where: floor_id ? { floor: { id: floor_id } } : {},
@@ -135,9 +137,19 @@ const roomService = {
             const allocations = room.roomAllocations || [];
 
             const activeAllocation = allocations.find(alloc => {
-                const checkIn = new Date(alloc.check_in_date);
-                const checkOut = new Date(alloc.check_out_date);
-                return (checkIn <= now && checkOut >= now && alloc.status !== 'CHECKED_OUT') || alloc.status === 'CHECKED_IN';
+                const checkInDate = new Date(alloc.check_in_date);
+                const checkOutDate = new Date(alloc.check_out_date);
+
+                if (startRange && endRange) {
+                    return (
+                        checkInDate < endRange &&
+                        checkOutDate > startRange &&
+                        alloc.status !== 'CANCELLED' &&
+                        alloc.status !== 'CHECKED_OUT'
+                    );
+                }
+
+                return (checkInDate <= now && checkOutDate >= now && alloc.status !== 'CHECKED_OUT') || alloc.status === 'CHECKED_IN';
             });
 
             let finalStatus = "NOT_CHECKED_IN";

@@ -12,4 +12,5 @@ router.post("/:id/cancel", authentification, bookingController.cancel);
 router.delete("/:id", bookingController.delete);
 router.put('/:bookingId/room-status', bookingController.updateRoomStatus);
 router.post("/:id/checkout", bookingController.checkout);
+router.put("/:id/change-room", authentification, bookingController.changeRoom);
 export default router;
