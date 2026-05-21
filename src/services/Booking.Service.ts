@@ -71,7 +71,7 @@ const bookingService = {
                 check_in_date: checkIn,
                 check_out_date: checkOut,
                 total_price: 0, // Update later
-                status: BookingStatus.PENDING,
+                status: payload.status === 'CHECKED_IN' ? BookingStatus.CHECKED_IN : BookingStatus.PENDING,
                 payment_status: PaymentStatus.PENDING,
                 order_code: Number(String(Date.now())),
                 expires_at: new Date(Date.now() + 15 * 60 * 1000),
@@ -103,12 +103,37 @@ const bookingService = {
                 const savedDetail = await transactionalEntityManager.save(detail);
 
                 const availableRooms = await AvailabilityService.findAvailableRooms(roomType.id, checkIn, checkOut, roomReq.quantity, transactionalEntityManager);
-                if (availableRooms.length < roomReq.quantity) {
+                if (!roomReq.roomId && availableRooms.length < roomReq.quantity) {
                     throw new Error(`Insufficient availability for room type: ${roomType.name}`);
                 }
 
                 for (let i = 0; i < roomReq.quantity; i++) {
-                    const physicalRoom = availableRooms[i];
+                    let physicalRoom = null;
+                    if (roomReq.roomId && i === 0) {
+                        physicalRoom = await transactionalEntityManager.getRepository(Room).findOneBy({ id: roomReq.roomId });
+                        if (!physicalRoom) throw new Error(`Room ID ${roomReq.roomId} not found`);
+                        
+                        // Check if the specific room is occupied in this period
+                        const busyCount = await transactionalEntityManager.getRepository(BookingRoomAllocation).createQueryBuilder("alloc")
+                            .innerJoin("alloc.bookingRoom", "bookingRoom")
+                            .innerJoin("bookingRoom.booking", "b")
+                            .where("alloc.room_id = :roomId", { roomId: roomReq.roomId })
+                            .andWhere("b.status != :cancelled", { cancelled: BookingStatus.CANCELLED })
+                            .andWhere("alloc.check_in_date < :checkOut AND alloc.check_out_date > :checkIn", {
+                                checkIn,
+                                checkOut
+                            })
+                            .getCount();
+                        if (busyCount > 0) {
+                            throw new Error(`Phòng ${physicalRoom.room_number} đã có người đặt hoặc đang sử dụng trong khoảng thời gian này.`);
+                        }
+                    } else {
+                        physicalRoom = availableRooms[i];
+                    }
+
+                    if (!physicalRoom) {
+                        throw new Error(`Insufficient availability for room type: ${roomType.name}`);
+                    }
 
                     // 3. Create Booking Room (individual room record)
                     const bookingRoom = transactionalEntityManager.create(BookingRoom, {
@@ -130,7 +155,7 @@ const bookingService = {
                         check_in_date: checkIn,
                         check_out_date: checkOut,
                         price_at_booking: basePrice,
-                        status: BookingRoomAllocationStatus.NOT_CHECKED_IN
+                        status: payload.status === 'CHECKED_IN' ? BookingRoomAllocationStatus.CHECKED_IN : BookingRoomAllocationStatus.NOT_CHECKED_IN
                     });
                     await transactionalEntityManager.save(allocation);
                 }

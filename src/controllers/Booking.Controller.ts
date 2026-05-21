@@ -109,13 +109,13 @@ const bookingController = {
         try {
             const id = parseInt(req.params.id as string);
             const currentUser = req["currentUser"];
-            
+
             const result = await bookingService.cancel(id, currentUser);
             res.status(200).json(result);
         } catch (error: any) {
             console.error("Error cancelling booking:", error);
-            const statusCode = error.message.includes("permission") ? 403 : 
-                             error.message.includes("not found") ? 404 : 400;
+            const statusCode = error.message.includes("permission") ? 403 :
+                error.message.includes("not found") ? 404 : 400;
             res.status(statusCode).json({ message: error.message || "Error cancelling booking" });
         }
     },
