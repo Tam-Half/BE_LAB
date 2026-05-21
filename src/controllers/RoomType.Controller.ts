@@ -31,7 +31,19 @@ const roomTypeController = {
         try {
             const id = parseInt(req.params.id as string);
             const payload = req.body;
-            await roomTypeService.update(id, payload);
+            const files = req.files as Express.Multer.File[];
+
+            let uploadedImages = [];
+            if (files && files.length > 0) {
+                const uploadPromises = files.map(file => uploadToCloudinary(file, "DoraHotel/RoomType"));
+                const results = await Promise.all(uploadPromises);
+                uploadedImages = results.map((result: any) => ({
+                    url: result.secure_url,
+                    public_id: result.public_id
+                }));
+            }
+
+            await roomTypeService.update(id, payload, uploadedImages);
             res.status(200).json({ message: "Cập nhật loại phòng thành công" });
         } catch (error) {
             console.log("Lỗi khi cập nhật loại phòng", error);
