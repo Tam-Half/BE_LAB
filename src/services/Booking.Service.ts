@@ -525,7 +525,7 @@ const bookingService = {
 
             const booking = await bookingRepo.findOne({
                 where: { id },
-                relations: ["bookingRooms", "bookingRooms.allocation", "bookingRooms.allocation.room", "serviceOrders"]
+                relations: ["bookingRooms", "bookingRooms.allocation", "bookingRooms.allocation.room", "serviceOrders", "bookingDetails"]
             });
 
             if (!booking) throw new Error("Booking not found");
@@ -535,9 +535,39 @@ const bookingService = {
                 return { booking, message: "Booking already completed" };
             }
 
-            // 1. Handle Extra Services (Minibar, etc.)
+            // Calculate actual nights stayed compared to now (checkout time)
+            const checkIn = new Date(booking.check_in_date);
+            const now = new Date();
+
+            const checkInDateOnly = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate());
+            const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            let nights = Math.round((nowDateOnly.getTime() - checkInDateOnly.getTime()) / (1000 * 3600 * 24));
+            if (nights < 0) nights = 0;
+
+            const isPastNoon = now.getHours() >= 12;
+            if (isPastNoon) {
+                nights += 1;
+            }
+            const actualNights = Math.max(1, nights);
+
+            // 1. Recalculate Actual Room Fee
+            let roomFee = 0;
+            if (booking.bookingDetails && booking.bookingDetails.length > 0) {
+                roomFee = booking.bookingDetails.reduce((sum, detail) => {
+                    return sum + (Number(detail.price_at_booking) * detail.quantity * actualNights);
+                }, 0);
+            } else if (booking.bookingRooms && booking.bookingRooms.length > 0) {
+                roomFee = booking.bookingRooms.reduce((sum, br) => {
+                    return sum + (Number(br.price_at_booking) * actualNights);
+                }, 0);
+            } else {
+                roomFee = Number(booking.total_price) || 0;
+            }
+
+            // 2. Handle Extra Services (Minibar, etc.)
+            let additionalTotal = 0;
             if (payload.extra_services && payload.extra_services.length > 0) {
-                let additionalTotal = 0;
                 for (const svcReq of payload.extra_services) {
                     const service = await extraSvcRepo.findOneBy({ id: svcReq.service_id });
                     if (!service) continue;
@@ -558,15 +588,25 @@ const bookingService = {
                     await serviceOrderRepo.save(serviceOrder);
                     additionalTotal += svcTotal;
                 }
-
-                // Recalculate Booking Total Price
-                const currentTotal = Number(booking.total_price) || 0;
-                // Since total_price already includes VAT (8%), we need to add new services + their VAT
-                const additionalWithVat = additionalTotal * 1.08;
-                booking.total_price = currentTotal + additionalWithVat;
             }
 
-            // 2. Update Booking Status
+            // Also check for any existing COMPLETED service orders to include in subtotal
+            let existingServicesTotal = 0;
+            if (booking.serviceOrders) {
+                for (const so of booking.serviceOrders) {
+                    if (so.status === ServiceOrderStatus.COMPLETED) {
+                        existingServicesTotal += Number(so.total_price) || 0;
+                    }
+                }
+            }
+
+            // 3. Recalculate Booking Total Price including 8% VAT
+            const subtotal = roomFee + existingServicesTotal + additionalTotal;
+            const vat = subtotal * 0.08;
+            booking.total_price = subtotal + vat;
+            booking.check_out_date = now; // Set actual checkout time!
+
+            // 4. Update Booking Status
             booking.status = BookingStatus.COMPLETED;
             booking.payment_status = PaymentStatus.PAID;
             await bookingRepo.save(booking);
