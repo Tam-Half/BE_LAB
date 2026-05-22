@@ -126,7 +126,7 @@ const AvailabilityService = {
             .innerJoin("allocation.bookingRoom", "bookingRoom")
             .innerJoin("bookingRoom.booking", "booking")
             .where("room.room_type_id = :roomTypeId", { roomTypeId })
-            .andWhere("booking.status != :cancelled", { cancelled: BookingStatus.CANCELLED })
+            .andWhere("booking.status != :cancelled AND booking.status != :expired", { cancelled: BookingStatus.CANCELLED, expired: BookingStatus.EXPIRED })
             .andWhere("allocation.check_in_date < :checkOut AND allocation.check_out_date > :checkIn", {
                 checkIn,
                 checkOut
@@ -166,12 +166,13 @@ const AvailabilityService = {
                     .from(BookingRoomAllocation, "allocation")
                     .innerJoin("allocation.bookingRoom", "bookingRoom")
                     .innerJoin("bookingRoom.booking", "booking")
-                    .where("booking.status != :cancelled", { cancelled: BookingStatus.CANCELLED })
+                    .where("booking.status != :cancelled AND booking.status != :expired", { cancelled: BookingStatus.CANCELLED, expired: BookingStatus.EXPIRED })
                     .andWhere("allocation.check_in_date < :checkOutDate AND allocation.check_out_date > :checkInDate")
                     .getQuery();
                 return "room.id NOT IN (" + subQuery + ")";
             })
             .setParameter("cancelled", BookingStatus.CANCELLED)
+            .setParameter("expired", BookingStatus.EXPIRED)
             .setParameter("checkInDate", checkInDate)
             .setParameter("checkOutDate", checkOutDate)
             .limit(limit)

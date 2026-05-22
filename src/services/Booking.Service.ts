@@ -118,7 +118,7 @@ const bookingService = {
                             .innerJoin("alloc.bookingRoom", "bookingRoom")
                             .innerJoin("bookingRoom.booking", "b")
                             .where("alloc.room_id = :roomId", { roomId: roomReq.roomId })
-                            .andWhere("b.status != :cancelled", { cancelled: BookingStatus.CANCELLED })
+                            .andWhere("b.status != :cancelled AND b.status != :expired", { cancelled: BookingStatus.CANCELLED, expired: BookingStatus.EXPIRED })
                             .andWhere("alloc.check_in_date < :checkOut AND alloc.check_out_date > :checkIn", {
                                 checkIn,
                                 checkOut
@@ -711,7 +711,7 @@ const bookingService = {
                 .innerJoin("alloc.bookingRoom", "bookingRoom")
                 .innerJoin("bookingRoom.booking", "b")
                 .where("alloc.room_id = :targetRoomId", { targetRoomId })
-                .andWhere("b.status != :cancelled", { cancelled: BookingStatus.CANCELLED })
+                .andWhere("b.status != :cancelled AND b.status != :expired", { cancelled: BookingStatus.CANCELLED, expired: BookingStatus.EXPIRED })
                 .andWhere("alloc.id != :currentAllocId", { currentAllocId: allocationId })
                 .andWhere("alloc.check_in_date < :checkOutForCheck AND alloc.check_out_date > :checkInForCheck", {
                     checkInForCheck,
