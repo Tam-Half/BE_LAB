@@ -23,3 +23,13 @@ export const authentification = (
     req["currentUser"] = decode;
     next();
 };
+
+export const checkRole = (allowedRoles: string[]) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        const currentUser = req["currentUser"];
+        if (!currentUser || !allowedRoles.includes(currentUser.role)) {
+            return res.status(403).json({ message: "Bạn không có quyền thực hiện hành động này (Forbidden)" });
+        }
+        next();
+    };
+};
