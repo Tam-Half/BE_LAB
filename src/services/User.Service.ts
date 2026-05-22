@@ -61,6 +61,61 @@ const userService = {
         account.password = hashedPassword;
         await accountRepository.save(account);
         return true;
+    },
+    getAccountsForAdmin: async () => {
+        return await userRepository.find({
+            relations: ["account"],
+            order: { createdAt: "DESC" }
+        });
+    },
+    updateAccountByAdmin: async (userId: string, payload: any) => {
+        const user = await userRepository.findOne({
+            where: { id: userId },
+            relations: ["account"]
+        });
+        if (!user) {
+            throw new Error("Không tìm thấy người dùng");
+        }
+
+        user.name = payload.name;
+        user.phone_number = payload.phone_number;
+        await userRepository.save(user);
+
+        const account = user.account;
+        if (account) {
+            if (payload.email && payload.email !== account.email) {
+                const existingEmail = await accountRepository.findOne({ where: { email: payload.email } });
+                if (existingEmail) {
+                    throw new Error("Email đã được sử dụng");
+                }
+                account.email = payload.email;
+            }
+            if (payload.role) {
+                account.role = payload.role;
+            }
+            if (payload.is_active !== undefined) {
+                account.is_active = payload.is_active;
+            }
+            await accountRepository.save(account);
+        }
+        return user;
+    },
+    resetPasswordByAdmin: async (userId: string, newPassword: string) => {
+        const user = await userRepository.findOne({
+            where: { id: userId },
+            relations: ["account"]
+        });
+        if (!user) {
+            throw new Error("Không tìm thấy người dùng");
+        }
+        const account = user.account;
+        if (!account) {
+            throw new Error("Không tìm thấy tài khoản liên kết");
+        }
+        const hashedPassword = await encrypt.encryptPassword(newPassword);
+        account.password = hashedPassword;
+        await accountRepository.save(account);
+        return true;
     }
 }
 

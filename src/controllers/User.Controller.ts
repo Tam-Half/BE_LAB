@@ -44,6 +44,37 @@ const userController = {
             console.log("Lỗi đặt lại mật khẩu", error)
             res.status(400).json({ message: error.message || "Lỗi khi thực hiện yêu cầu" });
         }
+    },
+    getAccountsForAdmin: async (req, res) => {
+        try {
+            const accounts = await userService.getAccountsForAdmin();
+            res.status(200).json(accounts);
+        } catch (error) {
+            console.log("Lỗi lấy danh sách tài khoản cho Admin", error);
+            res.status(500).json({ message: "Lỗi hệ thống khi lấy danh sách tài khoản" });
+        }
+    },
+    updateAccountByAdmin: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const payload = req.body;
+            await userService.updateAccountByAdmin(id, payload);
+            res.status(200).json({ message: "Cập nhật thông tin tài khoản thành công" });
+        } catch (error) {
+            console.log("Lỗi cập nhật tài khoản Admin", error);
+            res.status(400).json({ message: error.message || "Lỗi khi cập nhật tài khoản" });
+        }
+    },
+    resetPasswordByAdmin: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { newPassword } = req.body;
+            await userService.resetPasswordByAdmin(id, newPassword);
+            res.status(200).json({ message: "Đặt lại mật khẩu thành công" });
+        } catch (error) {
+            console.log("Lỗi đặt lại mật khẩu của Admin", error);
+            res.status(400).json({ message: error.message || "Lỗi khi đặt lại mật khẩu" });
+        }
     }
 }
 
