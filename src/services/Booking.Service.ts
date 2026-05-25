@@ -102,38 +102,53 @@ const bookingService = {
                 });
                 const savedDetail = await transactionalEntityManager.save(detail);
 
-                const availableRooms = await AvailabilityService.findAvailableRooms(roomType.id, checkIn, checkOut, roomReq.quantity, transactionalEntityManager);
-                if (!roomReq.roomId && availableRooms.length < roomReq.quantity) {
+                const selectedRooms: Room[] = [];
+                if (roomReq.roomId) {
+                    const specificRoom = await transactionalEntityManager.getRepository(Room).findOne({
+                        where: { id: roomReq.roomId },
+                        relations: ["roomType"]
+                    });
+                    if (!specificRoom) {
+                        throw new Error(`Room ID ${roomReq.roomId} not found`);
+                    }
+
+                    // Check if the specific room is occupied in this period
+                    const busyCount = await transactionalEntityManager.getRepository(BookingRoomAllocation).createQueryBuilder("alloc")
+                        .innerJoin("alloc.bookingRoom", "bookingRoom")
+                        .innerJoin("bookingRoom.booking", "b")
+                        .where("alloc.room_id = :roomId", { roomId: roomReq.roomId })
+                        .andWhere("b.status != :cancelled AND b.status != :expired", { cancelled: BookingStatus.CANCELLED, expired: BookingStatus.EXPIRED })
+                        .andWhere("alloc.check_in_date < :checkOut AND alloc.check_out_date > :checkIn", {
+                            checkIn,
+                            checkOut
+                        })
+                        .getCount();
+                    if (busyCount > 0) {
+                        throw new Error(`Phòng ${specificRoom.room_number} đã có người đặt hoặc đang sử dụng trong khoảng thời gian này.`);
+                    }
+                    selectedRooms.push(specificRoom);
+                }
+
+                const availableRooms = await AvailabilityService.findAvailableRooms(
+                    roomType.id, 
+                    checkIn, 
+                    checkOut, 
+                    roomReq.quantity + (roomReq.roomId ? 1 : 0), 
+                    transactionalEntityManager
+                );
+
+                for (const room of availableRooms) {
+                    if (selectedRooms.length >= roomReq.quantity) break;
+                    if (roomReq.roomId && room.id === roomReq.roomId) continue;
+                    selectedRooms.push(room);
+                }
+
+                if (selectedRooms.length < roomReq.quantity) {
                     throw new Error(`Insufficient availability for room type: ${roomType.name}`);
                 }
 
                 for (let i = 0; i < roomReq.quantity; i++) {
-                    let physicalRoom = null;
-                    if (roomReq.roomId && i === 0) {
-                        physicalRoom = await transactionalEntityManager.getRepository(Room).findOneBy({ id: roomReq.roomId });
-                        if (!physicalRoom) throw new Error(`Room ID ${roomReq.roomId} not found`);
-                        
-                        // Check if the specific room is occupied in this period
-                        const busyCount = await transactionalEntityManager.getRepository(BookingRoomAllocation).createQueryBuilder("alloc")
-                            .innerJoin("alloc.bookingRoom", "bookingRoom")
-                            .innerJoin("bookingRoom.booking", "b")
-                            .where("alloc.room_id = :roomId", { roomId: roomReq.roomId })
-                            .andWhere("b.status != :cancelled AND b.status != :expired", { cancelled: BookingStatus.CANCELLED, expired: BookingStatus.EXPIRED })
-                            .andWhere("alloc.check_in_date < :checkOut AND alloc.check_out_date > :checkIn", {
-                                checkIn,
-                                checkOut
-                            })
-                            .getCount();
-                        if (busyCount > 0) {
-                            throw new Error(`Phòng ${physicalRoom.room_number} đã có người đặt hoặc đang sử dụng trong khoảng thời gian này.`);
-                        }
-                    } else {
-                        physicalRoom = availableRooms[i];
-                    }
-
-                    if (!physicalRoom) {
-                        throw new Error(`Insufficient availability for room type: ${roomType.name}`);
-                    }
+                    const physicalRoom = selectedRooms[i];
 
                     // 3. Create Booking Room (individual room record)
                     const bookingRoom = transactionalEntityManager.create(BookingRoom, {
