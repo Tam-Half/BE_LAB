@@ -27,47 +27,47 @@ export const initCron = () => {
 
   job.start();
 
-  const checkInJob = new CronJob('0 9 * * *', async () => {
-    console.log('[CRON] Running auto check-in job...');
-    try {
-      await AppDataSource.transaction(async (manager) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+  // const checkInJob = new CronJob('0 9 * * *', async () => {
+  //   console.log('[CRON] Running auto check-in job...');
+  //   try {
+  //     await AppDataSource.transaction(async (manager) => {
+  //       const today = new Date();
+  //       today.setHours(0, 0, 0, 0);
+  //       const tomorrow = new Date(today);
+  //       tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const bookingsToCheckIn = await manager.find(Booking, {
-          where: {
-            status: BookingStatus.CONFIRMED,
-            check_in_date: Between(today, tomorrow)
-          },
-          relations: ['bookingRooms', 'bookingRooms.allocation']
-        });
+  //       const bookingsToCheckIn = await manager.find(Booking, {
+  //         where: {
+  //           status: BookingStatus.CONFIRMED,
+  //           check_in_date: Between(today, tomorrow)
+  //         },
+  //         relations: ['bookingRooms', 'bookingRooms.allocation']
+  //       });
 
-        if (bookingsToCheckIn.length === 0) {
-          console.log('[CRON] No bookings found for auto check-in today.');
-          return;
-        }
+  //       if (bookingsToCheckIn.length === 0) {
+  //         console.log('[CRON] No bookings found for auto check-in today.');
+  //         return;
+  //       }
 
-        for (const booking of bookingsToCheckIn) {
-          booking.status = BookingStatus.CHECKED_IN;
-          await manager.save(booking);
+  //       for (const booking of bookingsToCheckIn) {
+  //         booking.status = BookingStatus.CHECKED_IN;
+  //         await manager.save(booking);
 
-          if (booking.bookingRooms) {
-            for (const br of booking.bookingRooms) {
-              if (br.allocation) {
-                br.allocation.status = BookingRoomAllocationStatus.CHECKED_IN;
-                await manager.save(br.allocation);
-              }
-            }
-          }
-        }
-        console.log(`[CRON] Auto check-in completed. Processed ${bookingsToCheckIn.length} bookings.`);
-      });
-    } catch (error) {
-      console.error('[CRON] Error during auto check-in job:', error);
-    }
-  });
+  //         if (booking.bookingRooms) {
+  //           for (const br of booking.bookingRooms) {
+  //             if (br.allocation) {
+  //               br.allocation.status = BookingRoomAllocationStatus.CHECKED_IN;
+  //               await manager.save(br.allocation);
+  //             }
+  //           }
+  //         }
+  //       }
+  //       console.log(`[CRON] Auto check-in completed. Processed ${bookingsToCheckIn.length} bookings.`);
+  //     });
+  //   } catch (error) {
+  //     console.error('[CRON] Error during auto check-in job:', error);
+  //   }
+  // });
 
-  checkInJob.start();
+  // checkInJob.start();
 };
