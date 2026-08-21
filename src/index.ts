@@ -29,26 +29,30 @@ app.use(express.json())
 app.use(cors())
 app.use(loggingMiddleware)
 
+const API_PREFIX = "/api/v1";
+
 initDataSource()
+
     .then(async () => {
 
         app.use(cors({ origin: '*' }))
 
-        app.use("/api/auth", authRouter)
-        app.use("/api/user",authentification,userRouter)
-        app.use("/api/floor", floorRouter)
-        app.use("/api/hotel", hotelRouter)
-        app.use("/api/room", authentification,roomRouter)
-        app.use("/api/room-type", roomTypeRouter)
-        app.use("/api/bookings", bookingRouter)
-        app.use("/api/payments", paymentRouter)
-        app.use("/api/availability", availabilityRouter)
-        app.use("/api/extra-service", extraServiceRouter)
-        app.use("/api/shifts", shiftRouter)
-        app.use("/api/chat", chatRouter)
-        app.use("/api/room-classes", roomClassRouter)
-        app.use("/api/reviews", reviewRouter)
-        app.use("/api/reports", reportRouter)
+        app.use(`${API_PREFIX}/auth`, authRouter)
+
+        app.use(`${API_PREFIX}/user`, authentification, userRouter)
+        app.use(`${API_PREFIX}/floor`, floorRouter)
+        app.use(`${API_PREFIX}/hotel`, hotelRouter)
+        app.use(`${API_PREFIX}/room`, authentification, roomRouter)
+        app.use(`${API_PREFIX}/room-type`, roomTypeRouter)
+        app.use(`${API_PREFIX}/bookings`, bookingRouter)
+        app.use(`${API_PREFIX}/payments`, paymentRouter)
+        app.use(`${API_PREFIX}/availability`, availabilityRouter)
+        app.use(`${API_PREFIX}/extra-service`, extraServiceRouter)
+        app.use(`${API_PREFIX}/shifts`, shiftRouter)
+        app.use(`${API_PREFIX}/chat`, chatRouter)
+        app.use(`${API_PREFIX}/room-classes`, roomClassRouter)
+        app.use(`${API_PREFIX}/reviews`, reviewRouter)
+        app.use(`${API_PREFIX}/reports`, reportRouter)
         initCron()
 
         app.listen(port, () => {
