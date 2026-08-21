@@ -29,7 +29,7 @@ app.use(express.json())
 app.use(cors())
 app.use(loggingMiddleware)
 
-const API_PREFIX = "/api/v1";
+const API_PREFIX = "/api/v2";
 
 initDataSource()
 
