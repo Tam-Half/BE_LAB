@@ -32,18 +32,18 @@ export const AppDataSource = new DataSource({
 
     ...(isProduction
         ? {
-            url: process.env.DB_URL,
-            ssl: {
-                rejectUnauthorized: false
-            }
-        }
+              url: process.env.DB_URL,
+              ssl: {
+                  rejectUnauthorized: false,
+              },
+          }
         : {
-            host: process.env.DB_HOST,
-            port: Number(process.env.DB_PORT),
-            username: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME
-        }),
+              host: process.env.DB_HOST,
+              port: Number(process.env.DB_PORT),
+              username: process.env.DB_USER,
+              password: process.env.DB_PASSWORD,
+              database: process.env.DB_NAME,
+          }),
 
     synchronize: true,
     logging: false,
@@ -68,7 +68,7 @@ export const AppDataSource = new DataSource({
         BookingRoom,
         ServiceOrder,
         ExtraService,
-        Shift
+        Shift,
     ],
 
     migrations: [],
@@ -76,11 +76,10 @@ export const AppDataSource = new DataSource({
 })
 
 export async function initDataSource() {
-    try {
+    if (!AppDataSource.isInitialized) {
         await AppDataSource.initialize()
         console.log("Database connected successfully")
-    } catch (error) {
-        console.error("Database connection failed:", error)
-        throw error
     }
+
+    return AppDataSource
 }

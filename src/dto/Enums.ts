@@ -36,7 +36,7 @@ export enum UserRole {
 
 export enum RoomStatus {
     AVAILABLE = "AVAILABLE",
-    OCCUPIED = "OCCUPIED",
+    BOOKED = "BOOKED",
     MAINTENANCE = "MAINTENANCE",
     DIRTY = "DIRTY"
 }

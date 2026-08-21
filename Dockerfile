@@ -2,7 +2,7 @@ FROM node:24-alpine
 
 WORKDIR /usr/src/app
 
-ENV NODE_ENV=production
+ENV NODE_ENV=test
 
 COPY package*.json ./
 
