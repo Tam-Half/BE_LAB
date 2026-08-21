@@ -10,6 +10,7 @@ import {
 import { Floor } from "./Floor";
 import { RoomType } from "./RoomType";
 import { BookingRoomAllocation } from "./BookingRoomAllocation";
+import { RoomStatus } from "./Enums";
 
 @Entity({ name: "rooms" })
 export class Room {
@@ -27,8 +28,12 @@ export class Room {
     @JoinColumn({ name: "room_type_id" })
     roomType: RoomType;
 
-    @Column({ nullable: true })
-    status: string;
+    @Column({
+        type: "enum",
+        enum: RoomStatus,
+        default: RoomStatus.AVAILABLE
+    })
+    status: RoomStatus;
 
     @CreateDateColumn()
     created_at: Date;

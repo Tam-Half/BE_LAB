@@ -8,8 +8,12 @@ import { RoomType } from "../dto/RoomType";
 import { Room } from "../dto/Room";
 import { BookingRoom } from "../dto/BookingRoom";
 import { BookingRoomAllocation } from "../dto/BookingRoomAllocation";
+import { ServiceOrder } from "../dto/ServiceOrder";
+import { ExtraService } from "../dto/ExtraService";
+import { Payment } from "../dto/Payment";
 import AvailabilityService from "./Availability.Service";
 import { BookingFilter } from "../interfaces/Booking";
+import { BookingStatus, BookingRoomAllocationStatus, ServiceOrderStatus, PaymentStatus, RoomStatus } from "../dto/Enums";
 
 const bookingRepository = AppDataSource.getRepository(Booking);
 const bookingDetailRepository = AppDataSource.getRepository(BookingDetail);
@@ -19,6 +23,8 @@ const promotionRepository = AppDataSource.getRepository(Promotion);
 const roomTypeRepository = AppDataSource.getRepository(RoomType);
 const roomRepository = AppDataSource.getRepository(Room);
 const allocationRepository = AppDataSource.getRepository(BookingRoomAllocation);
+const extraServiceRepository = AppDataSource.getRepository(ExtraService);
+const serviceOrderRepository = AppDataSource.getRepository(ServiceOrder);
 
 const bookingService = {
     create: async (payload: any) => {
@@ -31,6 +37,7 @@ const bookingService = {
             guest_phone,
             guest_email,
             promotion_code,
+            extra_services, // Array of { service_id, quantity }
             note
         } = payload;
 
@@ -64,8 +71,9 @@ const bookingService = {
                 check_in_date: checkIn,
                 check_out_date: checkOut,
                 total_price: 0, // Update later
-                status: "PENDING",
-                payment_status: "unpaid",
+                status: payload.status === 'CHECKED_IN' ? BookingStatus.CHECKED_IN : BookingStatus.PENDING,
+                payment_status: PaymentStatus.PENDING,
+                order_code: Number(String(Date.now())),
                 expires_at: new Date(Date.now() + 15 * 60 * 1000),
                 note,
                 guest_name,
@@ -94,13 +102,53 @@ const bookingService = {
                 });
                 const savedDetail = await transactionalEntityManager.save(detail);
 
-                const availableRooms = await AvailabilityService.findAvailableRooms(roomType.id, checkIn, checkOut, roomReq.quantity);
-                if (availableRooms.length < roomReq.quantity) {
+                const selectedRooms: Room[] = [];
+                if (roomReq.roomId) {
+                    const specificRoom = await transactionalEntityManager.getRepository(Room).findOne({
+                        where: { id: roomReq.roomId },
+                        relations: ["roomType"]
+                    });
+                    if (!specificRoom) {
+                        throw new Error(`Room ID ${roomReq.roomId} not found`);
+                    }
+
+                    // Check if the specific room is occupied in this period
+                    const busyCount = await transactionalEntityManager.getRepository(BookingRoomAllocation).createQueryBuilder("alloc")
+                        .innerJoin("alloc.bookingRoom", "bookingRoom")
+                        .innerJoin("bookingRoom.booking", "b")
+                        .where("alloc.room_id = :roomId", { roomId: roomReq.roomId })
+                        .andWhere("b.status != :cancelled AND b.status != :expired", { cancelled: BookingStatus.CANCELLED, expired: BookingStatus.EXPIRED })
+                        .andWhere("alloc.check_in_date < :checkOut AND alloc.check_out_date > :checkIn", {
+                            checkIn,
+                            checkOut
+                        })
+                        .getCount();
+                    if (busyCount > 0) {
+                        throw new Error(`Phòng ${specificRoom.room_number} đã có người đặt hoặc đang sử dụng trong khoảng thời gian này.`);
+                    }
+                    selectedRooms.push(specificRoom);
+                }
+
+                const availableRooms = await AvailabilityService.findAvailableRooms(
+                    roomType.id, 
+                    checkIn, 
+                    checkOut, 
+                    roomReq.quantity + (roomReq.roomId ? 1 : 0), 
+                    transactionalEntityManager
+                );
+
+                for (const room of availableRooms) {
+                    if (selectedRooms.length >= roomReq.quantity) break;
+                    if (roomReq.roomId && room.id === roomReq.roomId) continue;
+                    selectedRooms.push(room);
+                }
+
+                if (selectedRooms.length < roomReq.quantity) {
                     throw new Error(`Insufficient availability for room type: ${roomType.name}`);
                 }
 
                 for (let i = 0; i < roomReq.quantity; i++) {
-                    const physicalRoom = availableRooms[i];
+                    const physicalRoom = selectedRooms[i];
 
                     // 3. Create Booking Room (individual room record)
                     const bookingRoom = transactionalEntityManager.create(BookingRoom, {
@@ -122,7 +170,7 @@ const bookingService = {
                         check_in_date: checkIn,
                         check_out_date: checkOut,
                         price_at_booking: basePrice,
-                        status: "NOT_CHECKED_IN"
+                        status: payload.status === 'CHECKED_IN' ? BookingRoomAllocationStatus.CHECKED_IN : BookingRoomAllocationStatus.NOT_CHECKED_IN
                     });
                     await transactionalEntityManager.save(allocation);
                 }
@@ -137,6 +185,47 @@ const bookingService = {
             savedBooking.total_price = calculatedTotalPrice;
             await transactionalEntityManager.save(savedBooking);
 
+            // 5. Create Service Orders (Extra Services)
+            if (extra_services && extra_services.length > 0) {
+                for (const svcReq of extra_services) {
+                    // Handle both { service_id, quantity } and simple service_id (number)
+                    const svcId = typeof svcReq === 'object' ? svcReq.service_id : svcReq;
+                    const service = await extraServiceRepository.findOneBy({ id: svcId });
+                    if (!service) continue;
+
+                    const unitPrice = Number(service.base_price) || 0;
+                    const quantity = (typeof svcReq === 'object' ? svcReq.quantity : 1) || 1;
+                    const svcTotal = unitPrice * quantity;
+
+                    const serviceOrder = transactionalEntityManager.create(ServiceOrder, {
+                        booking: savedBooking,
+                        service: service,
+                        service_name_snapshot: service.name,
+                        quantity: quantity,
+                        unit_price: unitPrice,
+                        total_price: svcTotal,
+                        status: ServiceOrderStatus.PENDING
+                    });
+                    await transactionalEntityManager.save(serviceOrder);
+
+                    // Add to total booking price (optional, depending on business logic)
+                    // If room price already covers it or if it's separate
+                    calculatedTotalPrice += svcTotal;
+                }
+
+                // Final price update including services and 8% VAT
+                const subtotal = calculatedTotalPrice;
+                const vat = subtotal * 0.08;
+                savedBooking.total_price = subtotal + vat;
+                await transactionalEntityManager.save(savedBooking);
+            } else {
+                // Apply VAT even if no extra services
+                const subtotal = calculatedTotalPrice;
+                const vat = subtotal * 0.08;
+                savedBooking.total_price = subtotal + vat;
+                await transactionalEntityManager.save(savedBooking);
+            }
+
             return await transactionalEntityManager.findOne(Booking, {
                 where: { id: savedBooking.id },
                 relations: [
@@ -147,14 +236,16 @@ const bookingService = {
                     "bookingRooms.allocation.room",
                     "user",
                     "hotel",
-                    "promotion"
+                    "promotion",
+                    "serviceOrders",
+                    "serviceOrders.service"
                 ]
             });
         });
     },
 
     getAll: async (filters: BookingFilter) => {
-        const { status, user_id, hotel_id } = filters;
+        const { status, user_id, hotel_id, booking_code } = filters;
 
         // Xây dựng điều kiện lọc động
         const whereCondition: any = {};
@@ -171,9 +262,25 @@ const bookingService = {
             whereCondition.hotel = { id: hotel_id };
         }
 
+        if (booking_code) {
+            whereCondition.booking_code = booking_code;
+        }
+
         return await bookingRepository.find({
             where: whereCondition,
-            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion"],
+            relations: [
+                "bookingDetails",
+                "bookingDetails.roomType",
+                "bookingDetails.roomType.images",
+                "bookingRooms",
+                "bookingRooms.allocation",
+                "bookingRooms.allocation.room",
+                "user",
+                "hotel",
+                "promotion",
+                "serviceOrders",
+                "serviceOrders.service"
+            ],
             order: { created_at: "DESC" } // Thường booking nên hiện cái mới nhất lên đầu
         });
     },
@@ -182,22 +289,562 @@ const bookingService = {
     getById: async (id: number) => {
         return await bookingRepository.findOne({
             where: { id },
-            relations: ["bookingDetails", "bookingDetails.roomType", "user", "hotel", "promotion"]
+            relations: [
+                "bookingDetails",
+                "bookingDetails.roomType",
+                "bookingRooms",
+                "bookingRooms.allocation",
+                "bookingRooms.allocation.room",
+                "user",
+                "hotel",
+                "promotion",
+                "serviceOrders",
+                "serviceOrders.service"
+            ]
         });
     },
 
     update: async (id: number, payload: any) => {
-        const booking = await bookingRepository.findOneBy({ id });
-        if (!booking) throw new Error("Booking not found");
+        return await AppDataSource.transaction(async (transactionalEntityManager) => {
+            const bookingRepo = transactionalEntityManager.getRepository(Booking);
+            const serviceOrderRepo = transactionalEntityManager.getRepository(ServiceOrder);
+            const extraSvcRepo = transactionalEntityManager.getRepository(ExtraService);
 
-        bookingRepository.merge(booking, payload);
-        return await bookingRepository.save(booking);
+            const booking = await bookingRepo.findOne({
+                where: { id },
+                relations: ["serviceOrders", "bookingRooms"]
+            });
+
+            if (!booking) throw new Error("Booking not found");
+
+            const { extra_services, ...otherPayload } = payload;
+
+            // Update basic fields
+            transactionalEntityManager.merge(Booking, booking, otherPayload);
+
+            if (extra_services) {
+                // 1. Remove all existing service orders
+                await serviceOrderRepo.delete({ booking: { id: booking.id } });
+
+                // 2. Create and save new service orders
+                let servicesTotal = 0;
+                const newOrders = [];
+
+                for (const svcReq of extra_services) {
+                    const svcId = typeof svcReq === 'object' ? svcReq.service_id : svcReq;
+                    const service = await extraSvcRepo.findOneBy({ id: svcId });
+
+                    if (!service) continue;
+
+                    const unitPrice = Number(service.base_price) || 0;
+                    const quantity = (typeof svcReq === 'object' ? svcReq.quantity : 1) || 1;
+                    const svcTotal = unitPrice * quantity;
+
+                    const serviceOrder = serviceOrderRepo.create({
+                        booking: booking,
+                        service: service,
+                        service_name_snapshot: service.name,
+                        quantity: quantity,
+                        unit_price: unitPrice,
+                        total_price: svcTotal,
+                        status: ServiceOrderStatus.PENDING
+                    });
+
+                    newOrders.push(serviceOrder);
+                    servicesTotal += svcTotal;
+                }
+
+                if (newOrders.length > 0) {
+                    await serviceOrderRepo.save(newOrders);
+                }
+                booking.serviceOrders = newOrders;
+
+                // 3. Recalculate totals
+                let roomTotal = 0;
+                if (booking.bookingRooms) {
+                    const start = new Date(booking.check_in_date);
+                    const end = new Date(booking.check_out_date);
+                    const nights = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+
+                    for (const br of booking.bookingRooms) {
+                        roomTotal += (Number(br.price_at_booking) || 0) * nights;
+                    }
+                }
+
+                const subtotal = roomTotal + servicesTotal;
+                const vat = subtotal * 0.08;
+                booking.total_price = subtotal + vat;
+            }
+
+            return await bookingRepo.save(booking);
+        });
     },
 
     delete: async (id: number) => {
         const result = await bookingRepository.delete(id);
         return result;
-    }
+    },
+
+    confirmPayment: async (id: number, transactionId: string) => {
+        const booking = await bookingRepository.findOneBy({ id });
+        if (!booking) throw new Error("Booking not found");
+
+        booking.payment_status = PaymentStatus.PAID;
+        booking.status = BookingStatus.CONFIRMED;
+
+        return await bookingRepository.save(booking);
+    },
+
+    updateRoomStatus: async (bookingId: number, allocationId: number, targetStatus: BookingRoomAllocationStatus) => {
+        return await AppDataSource.transaction(async (transactionalEntityManager) => {
+            const validStatuses = [BookingRoomAllocationStatus.CHECKED_IN, BookingRoomAllocationStatus.CHECKED_OUT];
+
+            // Ép kiểu targetStatus về enum để so sánh an toàn
+            if (!validStatuses.includes(targetStatus)) {
+                throw new Error("Trạng thái không hợp lệ. Chỉ chấp nhận CHECKED_IN hoặc CHECKED_OUT.");
+            }
+
+            const allocation = await transactionalEntityManager.findOne(BookingRoomAllocation, {
+                where: { id: allocationId },
+                relations: ["bookingRoom", "bookingRoom.booking"]
+            });
+
+            if (!allocation) {
+                throw new Error("Không tìm thấy thông tin phân bổ phòng (Allocation) này.");
+            }
+
+            if (allocation.bookingRoom.booking.id !== bookingId) {
+                throw new Error("Phòng này không thuộc về mã đặt phòng yêu cầu.");
+            }
+
+            // Thay thế TOÀN BỘ chuỗi cứng bằng Enum
+            if (targetStatus === BookingRoomAllocationStatus.CHECKED_OUT && allocation.status !== BookingRoomAllocationStatus.CHECKED_IN) {
+                throw new Error("Không thể trả phòng (Check-out) khi phòng chưa được nhận (Check-in).");
+            }
+            if (targetStatus === BookingRoomAllocationStatus.CHECKED_IN && allocation.status === BookingRoomAllocationStatus.CHECKED_OUT) {
+                throw new Error("Phòng này đã được trả (Check-out), không thể nhận lại.");
+            }
+            if (allocation.status === targetStatus) {
+                throw new Error(`Phòng này đã ở trạng thái ${targetStatus} từ trước.`);
+            }
+
+            allocation.status = targetStatus;
+            await transactionalEntityManager.save(allocation);
+
+            const booking = await transactionalEntityManager.findOne(Booking, {
+                where: { id: bookingId },
+                relations: ["bookingRooms", "bookingRooms.allocation"]
+            });
+
+            if (booking) {
+                const allAllocations = booking.bookingRooms.map(br => br.allocation);
+
+                if (targetStatus === BookingRoomAllocationStatus.CHECKED_IN) {
+                    // Nếu khách bắt đầu nhận phòng đầu tiên -> Chuyển Booking thành CHECKED_IN
+                    if (booking.status !== BookingStatus.CHECKED_IN) {
+                        booking.status = BookingStatus.CHECKED_IN;
+                        await transactionalEntityManager.save(booking);
+                    }
+                } else if (targetStatus === BookingRoomAllocationStatus.CHECKED_OUT) {
+                    // Nếu trả phòng, kiểm tra xem TẤT CẢ các phòng đã trả hết chưa?
+                    const isAllCheckedOut = allAllocations.every(a => a.status === BookingRoomAllocationStatus.CHECKED_OUT);
+
+                    if (isAllCheckedOut) {
+                        booking.status = BookingStatus.COMPLETED;
+
+                        // Đã xóa phần copy-paste lỗi ở đây. Chỉ dùng transactionalEntityManager.
+                        await transactionalEntityManager.save(booking);
+                    }
+                }
+            }
+
+            return allocation;
+        });
+    },
+
+
+    cancel: async (id: number, currentUser: any) => {
+        return await AppDataSource.transaction(async (transactionalEntityManager) => {
+            const booking = await transactionalEntityManager.findOne(Booking, {
+                where: { id },
+                relations: ["user", "bookingRooms", "bookingRooms.allocation", "serviceOrders"]
+            });
+
+            if (!booking) throw new Error("Booking not found");
+
+            // Permission check: Owner or Admin
+            if (currentUser.role !== 'admin' && booking.user.id !== currentUser.id) {
+                throw new Error("You do not have permission to cancel this booking");
+            }
+
+            // Status check: Only allow PENDING or CONFIRMED to be cancelled
+            const ALLOWED_STATUSES = [BookingStatus.PENDING, BookingStatus.CONFIRMED];
+            if (!ALLOWED_STATUSES.includes(booking.status)) {
+                throw new Error(`Cannot cancel booking with status: ${booking.status}. Only PENDING or CONFIRMED bookings can be cancelled.`);
+            }
+
+            const now = new Date();
+            const checkIn = new Date(booking.check_in_date);
+            const diffTime = checkIn.getTime() - now.getTime();
+            const diffDays = diffTime / (1000 * 3600 * 24);
+
+            let message = "";
+            let refundAmount = 0;
+
+            if (diffDays > 3) {
+                refundAmount = Number(booking.total_price) * 0.5;
+                message = `Hủy đơn đặt thành công, vui lòng liên hệ hotline của khách sạn để nhận lại ${refundAmount.toLocaleString('vi-VN')} VND `;
+            } else {
+                message = "Hủy đơn đặt thành công, bạn sẽ không được hoàn lại tiền đơn hàng này do thời gian hủy quá sát ngày check-in";
+            }
+
+            // Update statuses
+            booking.status = BookingStatus.CANCELLED;
+            await transactionalEntityManager.save(booking);
+
+            // Cancel allocations (releases rooms)
+            if (booking.bookingRooms) {
+                for (const br of booking.bookingRooms) {
+                    if (br.allocation) {
+                        br.allocation.status = BookingRoomAllocationStatus.CANCELLED;
+                        await transactionalEntityManager.save(br.allocation);
+                    }
+                }
+            }
+
+            // Cancel service orders
+            if (booking.serviceOrders) {
+                for (const so of booking.serviceOrders) {
+                    if (so) {
+                        so.status = ServiceOrderStatus.CANCELLED;
+                        await transactionalEntityManager.save(so);
+                    }
+                }
+            }
+
+            return {
+                message: message,
+                refundAmount: refundAmount
+            };
+        });
+    },
+
+    checkout: async (id: number, payload: { payment_method: string, amount_paid?: number, transaction_id?: string, extra_services?: { service_id: number, quantity: number }[] }) => {
+        return await AppDataSource.transaction(async (transactionalEntityManager) => {
+            const bookingRepo = transactionalEntityManager.getRepository(Booking);
+            const allocationRepo = transactionalEntityManager.getRepository(BookingRoomAllocation);
+            const roomRepo = transactionalEntityManager.getRepository(Room);
+            const paymentRepo = transactionalEntityManager.getRepository(Payment);
+            const extraSvcRepo = transactionalEntityManager.getRepository(ExtraService);
+            const serviceOrderRepo = transactionalEntityManager.getRepository(ServiceOrder);
+
+            const booking = await bookingRepo.findOne({
+                where: { id },
+                relations: ["bookingRooms", "bookingRooms.allocation", "bookingRooms.allocation.room", "serviceOrders", "bookingDetails"]
+            });
+
+            if (!booking) throw new Error("Booking not found");
+
+            // Check if already completed
+            if (booking.status === BookingStatus.COMPLETED) {
+                return { booking, message: "Booking already completed" };
+            }
+
+            // Calculate actual nights stayed compared to now (checkout time)
+            const checkIn = new Date(booking.check_in_date);
+            const now = new Date();
+
+            const checkInDateOnly = new Date(checkIn.getFullYear(), checkIn.getMonth(), checkIn.getDate());
+            const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            let nights = Math.round((nowDateOnly.getTime() - checkInDateOnly.getTime()) / (1000 * 3600 * 24));
+            if (nights < 0) nights = 0;
+
+            const isPastNoon = now.getHours() >= 12;
+            if (isPastNoon) {
+                nights += 1;
+            }
+            const actualNights = Math.max(1, nights);
+
+            // 1. Recalculate Actual Room Fee
+            let roomFee = 0;
+            if (booking.bookingDetails && booking.bookingDetails.length > 0) {
+                roomFee = booking.bookingDetails.reduce((sum, detail) => {
+                    return sum + (Number(detail.price_at_booking) * detail.quantity * actualNights);
+                }, 0);
+            } else if (booking.bookingRooms && booking.bookingRooms.length > 0) {
+                roomFee = booking.bookingRooms.reduce((sum, br) => {
+                    return sum + (Number(br.price_at_booking) * actualNights);
+                }, 0);
+            } else {
+                roomFee = Number(booking.total_price) || 0;
+            }
+
+            // 2. Handle Extra Services (Minibar, etc.)
+            let additionalTotal = 0;
+            if (payload.extra_services && payload.extra_services.length > 0) {
+                for (const svcReq of payload.extra_services) {
+                    const service = await extraSvcRepo.findOneBy({ id: svcReq.service_id });
+                    if (!service) continue;
+
+                    const unitPrice = Number(service.base_price) || 0;
+                    const quantity = svcReq.quantity || 1;
+                    const svcTotal = unitPrice * quantity;
+
+                    const serviceOrder = serviceOrderRepo.create({
+                        booking: booking,
+                        service: service,
+                        service_name_snapshot: service.name,
+                        quantity: quantity,
+                        unit_price: unitPrice,
+                        total_price: svcTotal,
+                        status: ServiceOrderStatus.COMPLETED // Already consumed at checkout
+                    });
+                    await serviceOrderRepo.save(serviceOrder);
+                    additionalTotal += svcTotal;
+                }
+            }
+
+            // Also check for any existing COMPLETED service orders to include in subtotal
+            let existingServicesTotal = 0;
+            if (booking.serviceOrders) {
+                for (const so of booking.serviceOrders) {
+                    if (so.status === ServiceOrderStatus.COMPLETED) {
+                        existingServicesTotal += Number(so.total_price) || 0;
+                    }
+                }
+            }
+
+            // 3. Recalculate Booking Total Price including 8% VAT
+            const subtotal = roomFee + existingServicesTotal + additionalTotal;
+            const vat = subtotal * 0.08;
+            booking.total_price = subtotal + vat;
+            booking.check_out_date = now; // Set actual checkout time!
+
+            // 4. Update Booking Status
+            booking.status = BookingStatus.COMPLETED;
+            booking.payment_status = PaymentStatus.PAID;
+            await bookingRepo.save(booking);
+
+            // 3. Update All Allocations and Rooms
+            if (booking.bookingRooms) {
+                for (const br of booking.bookingRooms) {
+                    if (br.allocation) {
+                        br.allocation.status = BookingRoomAllocationStatus.CHECKED_OUT;
+                        br.allocation.check_out_date = new Date();
+                        await allocationRepo.save(br.allocation);
+
+                        if (br.allocation.room) {
+                            br.allocation.room.status = RoomStatus.DIRTY;
+                            await roomRepo.save(br.allocation.room);
+                        }
+                    }
+                }
+            }
+
+            // 4. Create or Update Payment Record
+            let payment = await paymentRepo.findOneBy({ booking: { id: booking.id } });
+
+            if (payment) {
+                payment.status = PaymentStatus.PAID;
+                payment.payment_method = payload.payment_method;
+                payment.transaction_id = payload.transaction_id || payment.transaction_id;
+                payment.payment_time = new Date();
+                payment.amount = Number(booking.total_price);
+            } else {
+                payment = paymentRepo.create({
+                    booking: booking,
+                    amount: Number(booking.total_price),
+                    payment_method: payload.payment_method,
+                    transaction_id: payload.transaction_id,
+                    status: PaymentStatus.PAID,
+                    payment_time: new Date()
+                });
+            }
+            await paymentRepo.save(payment);
+
+            return { booking, payment };
+        });
+    },
+
+    changeRoom: async (bookingId: number, allocationId: number, targetRoomId: number, recalculatePrice: boolean = false) => {
+        return await AppDataSource.transaction(async (transactionalEntityManager) => {
+            const bookingRepo = transactionalEntityManager.getRepository(Booking);
+            const allocationRepo = transactionalEntityManager.getRepository(BookingRoomAllocation);
+            const roomRepo = transactionalEntityManager.getRepository(Room);
+            const bookingRoomRepo = transactionalEntityManager.getRepository(BookingRoom);
+
+            // 1. Tìm bản ghi Allocation với đầy đủ quan hệ
+            const allocation = await allocationRepo.findOne({
+                where: { id: allocationId },
+                relations: ["room", "bookingRoom", "bookingRoom.booking", "bookingRoom.roomType", "bookingRoom.booking.promotion"]
+            });
+
+            if (!allocation) {
+                throw new Error("Không tìm thấy thông tin phân bổ phòng (Allocation) cần đổi.");
+            }
+
+            const booking = allocation.bookingRoom.booking;
+            if (booking.id !== bookingId) {
+                throw new Error("Phòng phân bổ này không thuộc về đặt phòng yêu cầu.");
+            }
+
+            // Chỉ cho phép chuyển phòng khi Booking đang ở trạng thái CONFIRMED hoặc CHECKED_IN
+            if (booking.status !== BookingStatus.CHECKED_IN && booking.status !== BookingStatus.CONFIRMED) {
+                throw new Error("Chỉ có thể chuyển phòng cho đặt phòng đang ở trạng thái CONFIRMED hoặc CHECKED_IN.");
+            }
+
+            // 2. Tìm phòng vật lý mới
+            const targetRoom = await roomRepo.findOne({
+                where: { id: targetRoomId },
+                relations: ["roomType"]
+            });
+
+            if (!targetRoom) {
+                throw new Error("Phòng mục tiêu không tồn tại.");
+            }
+
+            if (targetRoom.status === RoomStatus.MAINTENANCE) {
+                throw new Error("Phòng mục tiêu đang trong trạng thái bảo trì.");
+            }
+
+            if (targetRoom.id === allocation.room.id) {
+                throw new Error("Phòng mới trùng với phòng hiện tại.");
+            }
+
+            // 3. Kiểm tra tính khả dụng của phòng mới từ Thời điểm hiện tại (hoặc check_in_date) đến check_out_date
+            const now = new Date();
+            const checkInForCheck = allocation.check_in_date > now ? allocation.check_in_date : now;
+            const checkOutForCheck = booking.check_out_date;
+
+            if (checkOutForCheck <= checkInForCheck) {
+                throw new Error("Thời gian lưu trú còn lại không hợp lệ.");
+            }
+
+            // Tìm xem phòng targetRoomId có bị trùng lịch với bất kỳ allocation nào của các booking chưa hủy khác không
+            const busyCount = await allocationRepo.createQueryBuilder("alloc")
+                .innerJoin("alloc.bookingRoom", "bookingRoom")
+                .innerJoin("bookingRoom.booking", "b")
+                .where("alloc.room_id = :targetRoomId", { targetRoomId })
+                .andWhere("b.status != :cancelled AND b.status != :expired", { cancelled: BookingStatus.CANCELLED, expired: BookingStatus.EXPIRED })
+                .andWhere("alloc.id != :currentAllocId", { currentAllocId: allocationId })
+                .andWhere("alloc.check_in_date < :checkOutForCheck AND alloc.check_out_date > :checkInForCheck", {
+                    checkInForCheck,
+                    checkOutForCheck
+                })
+                .getCount();
+
+            if (busyCount > 0) {
+                throw new Error("Phòng mục tiêu đã có người đặt hoặc đang sử dụng trong khoảng thời gian còn lại.");
+            }
+
+            const newRoomType = targetRoom.roomType;
+            const oldRoomType = allocation.bookingRoom.roomType;
+
+            // 4. Cập nhật phòng mới cho Allocation
+            allocation.room = targetRoom;
+            await allocationRepo.save(allocation);
+
+            // 5. Xử lý nâng/hạ cấp phòng & tính toán lại giá nếu khác loại phòng
+            if (newRoomType.id !== oldRoomType.id && recalculatePrice) {
+                const nights = Math.max(1, Math.ceil((booking.check_out_date.getTime() - booking.check_in_date.getTime()) / (1000 * 3600 * 24)));
+
+                // Cập nhật loại phòng mới cho BookingRoom
+                const bookingRoom = allocation.bookingRoom;
+                bookingRoom.roomType = newRoomType;
+
+                const newBasePrice = Number(newRoomType.base_price) || 0;
+                bookingRoom.price_at_booking = newBasePrice;
+                if (bookingRoom.pricing_snapshot) {
+                    bookingRoom.pricing_snapshot.base_price = newBasePrice;
+                }
+                await bookingRoomRepo.save(bookingRoom);
+
+                // Cập nhật lại Booking Detail tương ứng
+                const detailRepo = transactionalEntityManager.getRepository(BookingDetail);
+                const detail = await detailRepo.findOneBy({ booking: { id: booking.id }, roomType: { id: oldRoomType.id } });
+                if (detail) {
+                    if (detail.quantity > 1) {
+                        detail.quantity -= 1;
+                        await detailRepo.save(detail);
+
+                        let newDetail = await detailRepo.findOneBy({ booking: { id: booking.id }, roomType: { id: newRoomType.id } });
+                        if (newDetail) {
+                            newDetail.quantity += 1;
+                        } else {
+                            newDetail = detailRepo.create({
+                                booking: booking,
+                                roomType: newRoomType,
+                                quantity: 1,
+                                price_at_booking: newBasePrice
+                            });
+                        }
+                        await detailRepo.save(newDetail);
+                    } else {
+                        detail.roomType = newRoomType;
+                        detail.price_at_booking = newBasePrice;
+                        await detailRepo.save(detail);
+                    }
+                }
+
+                // Tính toán lại tổng tiền của Booking
+                const freshBooking = await bookingRepo.findOne({
+                    where: { id: booking.id },
+                    relations: ["bookingRooms", "serviceOrders", "promotion"]
+                });
+
+                if (freshBooking) {
+                    let roomTotal = 0;
+                    for (const br of freshBooking.bookingRooms) {
+                        const roomPrice = br.id === bookingRoom.id ? newBasePrice : (Number(br.price_at_booking) || 0);
+                        roomTotal += roomPrice * nights;
+                    }
+
+                    let servicesTotal = 0;
+                    if (freshBooking.serviceOrders) {
+                        for (const so of freshBooking.serviceOrders) {
+                            if (so.status !== ServiceOrderStatus.CANCELLED) {
+                                servicesTotal += Number(so.total_price) || 0;
+                            }
+                        }
+                    }
+
+                    let calculatedTotalPrice = roomTotal + servicesTotal;
+
+                    if (freshBooking.promotion && freshBooking.promotion.discount_percent) {
+                        const promotion = freshBooking.promotion;
+                        const discount = (calculatedTotalPrice * promotion.discount_percent) / 100;
+                        calculatedTotalPrice -= Math.min(discount, promotion.max_discount_amount || discount);
+                    }
+
+                    const subtotal = calculatedTotalPrice;
+                    const vat = subtotal * 0.08;
+                    freshBooking.total_price = subtotal + vat;
+                    await bookingRepo.save(freshBooking);
+                }
+            }
+
+            // Tải lại bản ghi booking hoàn chỉnh sau khi đổi
+            const updatedBooking = await bookingRepo.findOne({
+                where: { id: booking.id },
+                relations: [
+                    "bookingDetails",
+                    "bookingDetails.roomType",
+                    "bookingRooms",
+                    "bookingRooms.allocation",
+                    "bookingRooms.allocation.room",
+                    "serviceOrders",
+                    "promotion"
+                ]
+            });
+
+            return {
+                message: "Chuyển phòng thành công",
+                allocation,
+                booking: updatedBooking
+            };
+        });
+    },
 };
 
 export default bookingService;

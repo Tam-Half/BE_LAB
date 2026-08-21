@@ -4,9 +4,13 @@ import {
     Column,
     CreateDateColumn,
     OneToMany,
+    ManyToOne,
+    JoinColumn,
 } from "typeorm";
 import { RoomTypeImage } from "./RoomTypeImage";
 import { BookingRoom } from "./BookingRoom";
+import { Review } from "./Review";
+import { RoomClass } from "./RoomClass";
 
 @Entity({ name: "room_types" })
 export class RoomType {
@@ -43,4 +47,19 @@ export class RoomType {
     @OneToMany(() => BookingRoom, (br) => br.roomType)
     bookingRooms: BookingRoom[];
 
+    @OneToMany(() => Review, (review) => review.roomType)
+    reviews: Review[];
+
+    @Column({ type: "decimal", precision: 3, scale: 2, default: 0 })
+    average_rating: number;
+
+    @Column({ default: 0 })
+    review_count: number;
+
+    @Column({ nullable: true })
+    room_class_id: number;
+
+    @ManyToOne(() => RoomClass, (rc) => rc.roomTypes)
+    @JoinColumn({ name: "room_class_id" })
+    roomClass: RoomClass;
 }

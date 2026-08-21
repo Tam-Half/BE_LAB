@@ -13,6 +13,7 @@ import { Promotion } from "./Promotion";
 import { BookingDetail } from "./BookingDetail";
 import { BookingRoom } from "./BookingRoom";
 import { ServiceOrder } from "./ServiceOrder";
+import { BookingStatus, PaymentStatus } from "./Enums";
 
 @Entity({ name: "bookings" })
 export class Booking {
@@ -39,11 +40,19 @@ export class Booking {
     @Column({ type: "decimal", precision: 15, scale: 2, nullable: false })
     total_price: number;
 
-    @Column({ nullable: false })
-    status: string;
+    @Column({
+        type: "enum",
+        enum: BookingStatus,
+        default: BookingStatus.PENDING
+    })
+    status: BookingStatus;
 
-    @Column({ nullable: false })
-    payment_status: string;
+    @Column({
+        type: "enum",
+        enum: PaymentStatus,
+        default: PaymentStatus.PENDING
+    })
+    payment_status: PaymentStatus;
 
     @Column({ type: "text", nullable: true })
     note: string;
@@ -63,6 +72,9 @@ export class Booking {
     @ManyToOne(() => Promotion, (promotion) => promotion.id, { nullable: true })
     @JoinColumn({ name: "promotion_id" })
     promotion: Promotion;
+
+    @Column({ type: "bigint", nullable: true, unique: true })
+    order_code: number;
 
     @Column({ type: "timestamp", nullable: true })
     expires_at: Date;

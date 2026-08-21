@@ -2,6 +2,7 @@ import { encrypt } from "../helpers/helpers";
 import { AppDataSource } from "../data-source";
 import { Account } from "../dto/Account";
 import { User } from "../dto/User";
+import { UserRole } from "../dto/Enums";
 
 const accountRepository = AppDataSource.getRepository(Account);
 const userRepository = AppDataSource.getRepository(User);
@@ -22,9 +23,37 @@ const authService = {
             if (!user) {
                 throw new Error("Người dùng không tồn tại");
             }
-            const access_token = encrypt.generateAccessToken({ id: user.id, role: account.role });
-            const refresh_token = encrypt.generateRefreshToken({ id: user.id, role: account.role });
-            return { access_token, refresh_token };
+            const access_token = encrypt.generateAccessToken({ id: user.id, role: account.role as UserRole });
+            const refresh_token = encrypt.generateRefreshToken({ id: user.id, role: account.role as UserRole });
+            const accountId = account.id;
+            console.log("Account ID:", accountId);
+            return { access_token, refresh_token, accountId };
+        } catch (error) {
+            throw error;
+        }
+    },
+
+    refreshToken: async (payload: { refresh_token: string }) => {
+        try {
+            const { refresh_token } = payload;
+            if (!refresh_token) {
+                throw new Error("Refresh token không được cung cấp");
+            }
+
+            const decoded = await encrypt.verifyRefreshToken(refresh_token);
+
+            const user = await userRepository.findOneBy({ id: decoded.id });
+            if (!user) {
+                throw new Error("Người dùng không tồn tại hoặc đã bị xóa");
+            }
+
+            const new_access_token = encrypt.generateAccessToken({ id: user.id, role: decoded.role });
+            const new_refresh_token = encrypt.generateRefreshToken({ id: user.id, role: decoded.role });
+
+            return { 
+                access_token: new_access_token, 
+                refresh_token: new_refresh_token 
+            };
         } catch (error) {
             throw error;
         }

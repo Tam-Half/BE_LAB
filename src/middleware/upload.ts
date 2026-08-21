@@ -1,3 +1,5 @@
+/// <reference types="multer" />
+import "multer";
 import multer from "multer";
 import cloudinary from "../config/cloudinary";
 

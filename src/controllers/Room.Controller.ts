@@ -40,7 +40,31 @@ const roomController = {
             console.log("Lỗi khi lấy danh sách phòng", error);
             res.status(500).json({ message: "Lỗi khi lấy danh sách phòng", error: error.message });
         }
+    },
+
+    getRoomTimeline: async (req, res) => {
+        try {
+            const roomId = Number(req.params.id);
+            const data = await roomService.getRoomDetailTimeline(roomId);
+            res.status(200).json(data);
+        } catch (error: any) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
+    // API: GET /api/rooms/grid-status?floor_id=2&check_in=...&check_out=...
+    getRoomGrid: async ( req , res ) => {
+        try {
+            const floorId = req.query.floor_id ? Number(req.query.floor_id) : undefined;
+            const checkIn = req.query.check_in ? String(req.query.check_in) : undefined;
+            const checkOut = req.query.check_out ? String(req.query.check_out) : undefined;
+            const data = await roomService.getRoomGridStatus(floorId, checkIn, checkOut);
+            res.status(200).json(data);
+        } catch (error: any) {
+            res.status(500).json({ message: error.message });
+        }
     }
+
 }
 
 export default roomController;

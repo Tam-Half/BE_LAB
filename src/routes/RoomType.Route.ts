@@ -7,7 +7,7 @@ const router = Router();
 router.get("/", roomTypeController.getAll);
 router.get("/:id", roomTypeController.getById);
 router.post("/", upload.array("images"), roomTypeController.create);
-router.patch("/:id", roomTypeController.update);
+router.patch("/:id", upload.array("images"), roomTypeController.update);
 router.delete("/:id", roomTypeController.delete);
 
 

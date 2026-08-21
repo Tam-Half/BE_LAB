@@ -2,6 +2,7 @@ import { AppDataSource } from "../data-source";
 import { RoomType } from "../dto/RoomType";
 import { Room } from "../dto/Room";
 import { BookingRoomAllocation } from "../dto/BookingRoomAllocation";
+import { BookingStatus } from "../dto/Enums";
 
 const roomTypeRepository = AppDataSource.getRepository(RoomType);
 const roomRepository = AppDataSource.getRepository(Room);
@@ -46,7 +47,7 @@ const AvailabilityService = {
         for (const roomReq of rooms) {
             const roomType = await roomTypeRepository.findOne({
                 where: { id: roomReq.roomTypeId },
-                relations: ["images"]
+                relations: ["images", "roomClass"]
             });
 
             if (!roomType) continue;
@@ -58,6 +59,11 @@ const AvailabilityService = {
                 roomTypeId: roomType.id,
                 roomTypeName: roomType.name,
                 availableCount: availability.availableCount,
+                average_rating: roomType.average_rating,
+                size_m2: roomType.size_m2,
+                capacity_people: roomType.capacity_people,
+                review_count: roomType.review_count,
+                roomClass: roomType.roomClass,
                 ...priceInfo,
             });
 
@@ -74,7 +80,7 @@ const AvailabilityService = {
 
     discover: async (checkInDate: Date, checkOutDate: Date, nights: number) => {
         const allRoomTypes = await roomTypeRepository.find({
-            relations: ["images"]
+            relations: ["images", "roomClass"]
         });
         const results = [];
 
@@ -92,8 +98,14 @@ const AvailabilityService = {
                     busyCount: availability.busyCount,
                     availableCount: availability.availableCount,
                     capacity: roomType.capacity_people,
+                    average_rating: roomType.average_rating,
+                    review_count: roomType.review_count,
+                    roomClass: roomType.roomClass,
                     priceQuote: priceInfo,
-                    images: roomType.images
+                    images: roomType.images,
+                    size_m2: roomType.size_m2,
+                    capacity_people: roomType.capacity_people,
+
                 });
             }
         }
@@ -111,7 +123,10 @@ const AvailabilityService = {
 
         const busyCount = await allocationRepository.createQueryBuilder("allocation")
             .innerJoin("allocation.room", "room")
+            .innerJoin("allocation.bookingRoom", "bookingRoom")
+            .innerJoin("bookingRoom.booking", "booking")
             .where("room.room_type_id = :roomTypeId", { roomTypeId })
+            .andWhere("booking.status != :cancelled AND booking.status != :expired", { cancelled: BookingStatus.CANCELLED, expired: BookingStatus.EXPIRED })
             .andWhere("allocation.check_in_date < :checkOut AND allocation.check_out_date > :checkIn", {
                 checkIn,
                 checkOut
@@ -139,18 +154,25 @@ const AvailabilityService = {
         };
     },
 
-    findAvailableRooms: async (roomTypeId: number, checkInDate: Date, checkOutDate: Date, limit: number) => {
-        // Find rooms of type that don't have overlapping allocations
-        const availableRooms = await roomRepository.createQueryBuilder("room")
+    findAvailableRooms: async (roomTypeId: number, checkInDate: Date, checkOutDate: Date, limit: number, transactionalManager?: any) => {
+        const manager = transactionalManager || AppDataSource.manager;
+
+        // Find rooms of type that don't have overlapping allocations from active bookings
+        const availableRooms = await manager.createQueryBuilder(Room, "room")
             .where("room.room_type_id = :roomTypeId", { roomTypeId })
             .andWhere((qb) => {
                 const subQuery = qb.subQuery()
                     .select("allocation.room_id")
                     .from(BookingRoomAllocation, "allocation")
-                    .where("allocation.check_in_date < :checkOutDate AND allocation.check_out_date > :checkInDate")
+                    .innerJoin("allocation.bookingRoom", "bookingRoom")
+                    .innerJoin("bookingRoom.booking", "booking")
+                    .where("booking.status != :cancelled AND booking.status != :expired", { cancelled: BookingStatus.CANCELLED, expired: BookingStatus.EXPIRED })
+                    .andWhere("allocation.check_in_date < :checkOutDate AND allocation.check_out_date > :checkInDate")
                     .getQuery();
-                return "room.id NOT IN " + subQuery;
+                return "room.id NOT IN (" + subQuery + ")";
             })
+            .setParameter("cancelled", BookingStatus.CANCELLED)
+            .setParameter("expired", BookingStatus.EXPIRED)
             .setParameter("checkInDate", checkInDate)
             .setParameter("checkOutDate", checkOutDate)
             .limit(limit)

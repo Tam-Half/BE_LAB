@@ -1,14 +1,19 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToOne } from "typeorm";
 import { Room } from "./Room";
 import { BookingRoom } from "./BookingRoom";
+import { BookingRoomAllocationStatus } from "./Enums";
 
 @Entity({ name: "booking_room_allocation" })
 export class BookingRoomAllocation {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Column({ nullable: false })
-    status: string;
+    @Column({
+        type: "enum",
+        enum: BookingRoomAllocationStatus,
+        default: BookingRoomAllocationStatus.NOT_CHECKED_IN
+    })
+    status: BookingRoomAllocationStatus;
 
     @OneToOne(() => BookingRoom, (br) => br.allocation, { onDelete: "CASCADE" })
     @JoinColumn({ name: "booking_room_id" })

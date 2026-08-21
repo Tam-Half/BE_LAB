@@ -31,13 +31,53 @@ const roomTypeService = {
             throw error;
         }
     },
-    update: async (id: number, payload: any) => {
+    update: async (id: number, payload: any, images?: { url: string; public_id: string }[]) => {
         try {
             const roomType = await roomTypeRepository.findOne({ where: { id } });
             if (!roomType) {
                 throw new Error("Loại phòng không tồn tại");
             }
-            return await roomTypeRepository.update(id, payload);
+
+            // 1. Handle deleted images
+            let deletedImageIds: number[] = [];
+            if (payload.deleted_image_ids) {
+                try {
+                    if (typeof payload.deleted_image_ids === 'string') {
+                        deletedImageIds = JSON.parse(payload.deleted_image_ids);
+                    } else if (Array.isArray(payload.deleted_image_ids)) {
+                        deletedImageIds = payload.deleted_image_ids.map((x: any) => Number(x));
+                    }
+                } catch (e) {
+                    console.error("Error parsing deleted_image_ids:", e);
+                }
+            }
+
+            if (deletedImageIds.length > 0) {
+                await roomTypeImageRepository.delete(deletedImageIds);
+            }
+
+            // 2. Handle newly uploaded images
+            if (images && images.length > 0) {
+                const imageEntities = images.map(img => roomTypeImageRepository.create({
+                    ...img,
+                    roomType: { id } as any
+                }));
+                await roomTypeImageRepository.save(imageEntities);
+            }
+
+            // 3. Update main RoomType attributes safely to avoid relation query errors
+            const updatePayload: any = {};
+            if (payload.name !== undefined) updatePayload.name = payload.name;
+            if (payload.description !== undefined) updatePayload.description = payload.description;
+            if (payload.base_price !== undefined) updatePayload.base_price = Number(payload.base_price);
+            if (payload.capacity_people !== undefined) updatePayload.capacity_people = Number(payload.capacity_people);
+            if (payload.size_m2 !== undefined) updatePayload.size_m2 = Number(payload.size_m2);
+
+            if (Object.keys(updatePayload).length > 0) {
+                await roomTypeRepository.update(id, updatePayload);
+            }
+
+            return true;
         } catch (error) {
             throw error;
         }
@@ -56,7 +96,7 @@ const roomTypeService = {
     getAll: async () => {
         try {
             return await roomTypeRepository.find({
-                relations: ["images"]
+                relations: ["images", "reviews", "reviews.user", "roomClass"]
             });
         } catch (error) {
             throw error;
@@ -66,7 +106,7 @@ const roomTypeService = {
         try {
             const roomType = await roomTypeRepository.findOne({
                 where: { id },
-                relations: ["images"]
+                relations: ["images", "roomClass"]
             });
 
             if (!roomType) {
