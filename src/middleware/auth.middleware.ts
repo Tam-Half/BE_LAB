@@ -1,10 +1,11 @@
 import { NextFunction, Request, Response } from "express";
 import * as jwt from "jsonwebtoken";
 import * as dotenv from "dotenv";
-const { ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET } = require('../config/jwt');
+// const { ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET } = require('../config/jwt');
 
 dotenv.config();
 
+const { JWT_SECRET = "" } = process.env;
 export const authentification = (
     req: Request,
     res: Response,
@@ -22,7 +23,7 @@ export const authentification = (
 
     try {
         // Đưa jwt.verify vào trong try-catch để bắt lỗi hết hạn
-        const decode = jwt.verify(token, ACCESS_TOKEN_SECRET);
+        const decode = jwt.verify(token, JWT_SECRET);
         
         req["currentUser"] = decode;
         next();
