@@ -3,6 +3,7 @@ import { AppDataSource } from "../data-source";
 import { Account } from "../dto/Account";
 import { User } from "../dto/User";
 import { UserRole } from "../dto/Enums";
+import redisClient from "../config/redis";
 
 const accountRepository = AppDataSource.getRepository(Account);
 const userRepository = AppDataSource.getRepository(User);
@@ -27,6 +28,10 @@ const authService = {
             const refresh_token = encrypt.generateRefreshToken({ id: user.id, role: account.role as UserRole });
             const accountId = account.id;
             console.log("Account ID:", accountId);
+            const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60;
+            await redisClient.set(accountId.toString(), refresh_token, {
+                EX: REFRESH_TOKEN_TTL
+            });
             return { access_token, refresh_token, accountId };
         } catch (error) {
             throw error;
@@ -50,9 +55,9 @@ const authService = {
             const new_access_token = encrypt.generateAccessToken({ id: user.id, role: decoded.role });
             const new_refresh_token = encrypt.generateRefreshToken({ id: user.id, role: decoded.role });
 
-            return { 
-                access_token: new_access_token, 
-                refresh_token: new_refresh_token 
+            return {
+                access_token: new_access_token,
+                refresh_token: new_refresh_token
             };
         } catch (error) {
             throw error;
