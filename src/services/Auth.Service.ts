@@ -47,6 +47,12 @@ const authService = {
 
             const decoded = await encrypt.verifyRefreshToken(refresh_token);
 
+            const storedToken = await redisClient.get(`refresh_token:${decoded.id}`);
+
+            if (!storedToken || storedToken !== refresh_token) {
+                throw new Error("Token không hợp lệ, đã bị thu hồi hoặc đã hết hạn trong Redis!");
+            }
+
             const user = await userRepository.findOneBy({ id: decoded.id });
             if (!user) {
                 throw new Error("Người dùng không tồn tại hoặc đã bị xóa");
@@ -55,6 +61,10 @@ const authService = {
             const new_access_token = encrypt.generateAccessToken({ id: user.id, role: decoded.role });
             const new_refresh_token = encrypt.generateRefreshToken({ id: user.id, role: decoded.role });
 
+            await redisClient.set(`refresh_token:${user.id}`, new_refresh_token, {
+                EX: 7 * 24 * 60 * 60
+            });
+            
             return {
                 access_token: new_access_token,
                 refresh_token: new_refresh_token
