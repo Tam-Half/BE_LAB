@@ -29,7 +29,8 @@ const authService = {
             const accountId = account.id;
             console.log("Account ID:", accountId);
             const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60;
-            await redisClient.set(accountId.toString(), refresh_token, {
+            // SỬA DÒNG NÀY: Thay accountId.toString() thành `refresh_token:${user.id}`
+            await redisClient.set(`refresh_token:${user.id}`, refresh_token, {
                 EX: REFRESH_TOKEN_TTL
             });
             return { access_token, refresh_token, accountId };
@@ -64,7 +65,7 @@ const authService = {
             await redisClient.set(`refresh_token:${user.id}`, new_refresh_token, {
                 EX: 7 * 24 * 60 * 60
             });
-            
+
             return {
                 access_token: new_access_token,
                 refresh_token: new_refresh_token
