@@ -39,7 +39,7 @@ initDataSource()
 
         app.use(`${API_PREFIX}/auth`, authRouter)
 
-        app.use(`${API_PREFIX}/user`, authentification, userRouter)
+        app.use(`${API_PREFIX}/user`, userRouter)
         app.use(`${API_PREFIX}/floor`, floorRouter)
         app.use(`${API_PREFIX}/hotel`, hotelRouter)
         app.use(`${API_PREFIX}/room`, authentification, roomRouter)

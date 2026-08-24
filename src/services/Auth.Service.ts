@@ -30,9 +30,7 @@ const authService = {
             console.log("Account ID:", accountId);
             const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60;
             // SỬA DÒNG NÀY: Thay accountId.toString() thành `refresh_token:${user.id}`
-            await redisClient.set(`refresh_token:${user.id}`, refresh_token, {
-                EX: REFRESH_TOKEN_TTL
-            });
+            await redisClient.setex(`refresh_token:${user.id}`, REFRESH_TOKEN_TTL, refresh_token);
             return { access_token, refresh_token, accountId };
         } catch (error) {
             throw error;
@@ -62,9 +60,7 @@ const authService = {
             const new_access_token = encrypt.generateAccessToken({ id: user.id, role: decoded.role });
             const new_refresh_token = encrypt.generateRefreshToken({ id: user.id, role: decoded.role });
 
-            await redisClient.set(`refresh_token:${user.id}`, new_refresh_token, {
-                EX: 7 * 24 * 60 * 60
-            });
+            await redisClient.setex(`refresh_token:${user.id}`, 7 * 24 * 60 * 60, new_refresh_token);
 
             return {
                 access_token: new_access_token,
